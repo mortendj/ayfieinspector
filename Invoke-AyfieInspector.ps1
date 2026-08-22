@@ -39,6 +39,11 @@ Root URL of the Dashboard API that the rule engine, custom refiners, and source 
 all queried through. Defaults to "http://localhost/Dashboard/api" - this must run on the
 Saga/Ayfie Index host itself, since that endpoint isn't designed for remote access.
 
+.PARAMETER logLevel
+Sets the log level to trace, debug, info, warning or error. Off (no logging) is the default. Passed
+through to Winspect as well, so one flag controls both halves. Writes two separate log files (one
+per script), named after each script the same way Winspect names its own.
+
 .EXAMPLE
 .\Invoke-AyfieInspector.ps1
 Produces a combined Winspect + Ayfie custom-rules report, to the terminal and to a file.
@@ -63,7 +68,11 @@ param(
     [ValidateSet("terminal", "file", "both")]
     [string]$outputDestination = "both",
 
-    [string]$dashboardApiRootUrl = "http://localhost/Dashboard/api"
+    [string]$dashboardApiRootUrl = "http://localhost/Dashboard/api",
+
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("trace", "debug", "info", "warning", "error", "off")]
+    [string]$logLevel = "off"
 )
 
 if (-not (Test-Path $winspectPath)) {
@@ -74,9 +83,11 @@ if (-not (Test-Path $winspectPath)) {
 $SRC_DIR = Join-Path $PSScriptRoot "src"
 $WINSPECT_SRC_DIR = Join-Path (Split-Path $winspectPath -Parent) "src"
 
-# $logLevel must exist before Winspect's Logging.ps1 is dot-sourced (it builds a lookup table from
-# it at load time) - "off" keeps every Write-*Log call in the reused functions below a no-op.
-$logLevel = "off"
+# Get-LogFilePath (dot-sourced from Winspect's Logging.ps1 below) derives the log filename from
+# $SCRIPT_PATH - Winspect sets this itself at its own top level, but this script never did, so
+# turning logging on without this would crash the moment something actually tries to log. This
+# gives AyfieInspector its own log file, named after this script, separate from Winspect's own.
+$SCRIPT_PATH = $PSCommandPath
 . (Join-Path $WINSPECT_SRC_DIR "Constants.ps1")
 . (Join-Path $WINSPECT_SRC_DIR "Logging.ps1")
 . (Join-Path $WINSPECT_SRC_DIR "Utilities.ps1")
@@ -164,7 +175,7 @@ function Start-AyfieInspector() {
     Initialize-OutputFormatLayout $outputFormat
 
     Write-Host "Running Winspect ($winspectPath) for generic host facts..."
-    $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal
+    $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel
     $winspectReportText = $winspectReportLines -join $PHYSICAL_NEWLINE
 
     Write-Host "Querying rule engine at $dashboardApiRootUrl/rules ..."
