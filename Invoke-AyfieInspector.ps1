@@ -9,11 +9,12 @@ Reports on Ayfie Index / Saga installation specifics, on top of Winspect's gener
 
 .DESCRIPTION
 AyfieInspector composes Winspect (generic, product-agnostic host facts) with Ayfie-specific
-fact-gathering on top - the rule engine, custom refiners, and the Solr source reference count, all
-via the same Dashboard API. Winspect is invoked as-is and its report text is included unmodified;
-the Ayfie-specific sections reuse Winspect's own report-formatting functions (section headers,
-bolding pass) rather than re-implementing them, so the combined report reads as one consistent
-document.
+fact-gathering on top - the rule engine, custom refiners, and the Solr source reference count (all
+via the Dashboard API), plus the scheduled Saga restart task and outbound firewall openings Saga
+itself needs (neither via the API - built-in cmdlets/network checks instead). Winspect is invoked
+as-is and its report text is included unmodified; the Ayfie-specific sections reuse Winspect's own
+report-formatting functions (section headers, bolding pass) rather than re-implementing them, so
+the combined report reads as one consistent document.
 
 Only true customizations (rules with RuleType "custom", refiners not in the built-in default set)
 are reported here, not development-inserted or connector-installation rules. This is deliberately
@@ -44,6 +45,10 @@ Sets the log level to trace, debug, info, warning or error. Off (no logging) is 
 through to Winspect as well, so one flag controls both halves. Writes two separate log files (one
 per script), named after each script the same way Winspect names its own.
 
+.PARAMETER skipFirewallCheck
+Skips the outbound connectivity check (~15 URLs Ayfie/Saga itself needs reachable) - useful to
+avoid the added time when firewall state is already known or hasn't changed since the last run.
+
 .EXAMPLE
 .\Invoke-AyfieInspector.ps1
 Produces a combined Winspect + Ayfie custom-rules report, to the terminal and to a file.
@@ -72,7 +77,9 @@ param(
 
     [Parameter(Mandatory=$false)]
     [ValidateSet("trace", "debug", "info", "warning", "error", "off")]
-    [string]$logLevel = "off"
+    [string]$logLevel = "off",
+
+    [switch]$skipFirewallCheck
 )
 
 if (-not (Test-Path $winspectPath)) {
@@ -96,6 +103,8 @@ $SCRIPT_PATH = $PSCommandPath
 . (Join-Path $SRC_DIR "DashboardApi.ps1")
 . (Join-Path $SRC_DIR "RuleEngineInfo.ps1")
 . (Join-Path $SRC_DIR "RefinerInfo.ps1")
+. (Join-Path $SRC_DIR "ScheduledTaskInfo.ps1")
+. (Join-Path $SRC_DIR "FirewallInfo.ps1")
 
 function Get-CustomRulesReportSections($customRules) {
     # Index-side and query-side rules always get their own section, never merged into one list.
@@ -166,6 +175,49 @@ function Get-SolrInfoReportSection($dashboardApiRootUrl) {
     return New-SectionOutput "SOLR INFO" $lineScriptBlocks
 }
 
+function Get-ScheduledRestartReportSection() {
+    $restartTaskSummary = $null
+    try {
+        $restartTask = Get-ScheduledRestartTask
+        $restartTaskSummary = Get-ScheduledRestartSummary $restartTask
+    } catch {
+        Write-Warning "Failed to retrieve the scheduled restart task: $_"
+        $restartTaskSummary = [PSCustomObject]@{
+            TaskName      = $RESTART_TASK_NAME
+            ExecutionTime = "Unavailable"
+            Command       = "Unavailable"
+            User          = "Unavailable"
+        }
+    }
+    # Plain (unclosed) scriptblocks, not GetNewClosure() - none of these are in a loop, so there's
+    # no stale-variable risk, and a plain scriptblock resolves the local $restartTaskSummary
+    # correctly via normal dynamic scope resolution (see the SOLR INFO note above for why
+    # GetNewClosure() would be wrong, not just unnecessary, here).
+    $lineScriptBlocks = @(
+        { "Task name$FIELD_LABEL_SEPARATOR$($restartTaskSummary.TaskName)" },
+        { "Task execution time$FIELD_LABEL_SEPARATOR$($restartTaskSummary.ExecutionTime)" },
+        { "Task command$FIELD_LABEL_SEPARATOR$($restartTaskSummary.Command)" },
+        { "Task user$FIELD_LABEL_SEPARATOR$($restartTaskSummary.User)" }
+    )
+    return New-SectionOutput "SCHEDULED RESTART" $lineScriptBlocks
+}
+
+function Get-FirewallOpeningsReportSection() {
+    $firewallReport = "Skipped due to -skipFirewallCheck"
+    if (-not $skipFirewallCheck) {
+        $firewallReport = "Unavailable"
+        try {
+            $firewallReport = Get-FirewallReport $FIREWALL_OPENINGS $FIREWALL_OPENINGS_ALTERNATES
+        } catch {
+            Write-Warning "Failed to check firewall openings: $_"
+        }
+    }
+    $lineScriptBlocks = @(
+        { "$firewallReport" }
+    )
+    return New-SectionOutput "FIREWALL OPENINGS" $lineScriptBlocks
+}
+
 function Start-AyfieInspector() {
     # Mirrors Winspect's own Start-Winspect exactly (Remove-ExistingLogs + start/end INFO banners) -
     # without this, the log only ever contained DEBUG-level function-call entries from the reused
@@ -221,6 +273,16 @@ function Start-AyfieInspector() {
 
     Write-Host "Querying source reference count at $dashboardApiRootUrl/sourcereference/count ..."
     $newSectionsRaw += Get-SolrInfoReportSection $dashboardApiRootUrl
+
+    Write-Host "Checking the scheduled restart task ..."
+    $newSectionsRaw += Get-ScheduledRestartReportSection
+
+    if ($skipFirewallCheck) {
+        Write-Host "Skipping firewall openings check (-skipFirewallCheck)..."
+    } else {
+        Write-Host "Checking firewall openings (this can take a while)..."
+    }
+    $newSectionsRaw += Get-FirewallOpeningsReportSection
 
     # Reuse Winspect's own bolding/finalization pass on the new sections, via "terminal" so it
     # only returns formatted text here rather than writing a stray winspect-report.* file - the
