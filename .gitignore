@@ -1,0 +1,12 @@
+# Generated reports and logs
+ayfieinspector-report.txt
+ayfieinspector-report.md
+ayfieinspector-report.html
+*.log
+
+# Build output
+dist/
+
+# OS/editor cruft
+Thumbs.db
+.DS_Store
