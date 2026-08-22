@@ -167,6 +167,12 @@ function Get-SolrInfoReportSection($dashboardApiRootUrl) {
 }
 
 function Start-AyfieInspector() {
+    # Mirrors Winspect's own Start-Winspect exactly (Remove-ExistingLogs + start/end INFO banners) -
+    # without this, the log only ever contained DEBUG-level function-call entries from the reused
+    # logging functions, with nothing marking where a run actually started or ended.
+    Remove-ExistingLogs
+    Write-InfoLog "################### Starting $AYFIE_INSPECTOR_VERSION_STRING ###################"
+
     # Get-SectionHeader/Complete-Report (dot-sourced from Winspect) read these two by that exact
     # name as script-scope globals - $script: is required here so the assignment actually lands in
     # the shared scope those functions see, rather than a function-local shadow only this function
@@ -177,6 +183,24 @@ function Start-AyfieInspector() {
     Write-Host "Running Winspect ($winspectPath) for generic host facts..."
     $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel
     $winspectReportText = $winspectReportLines -join $PHYSICAL_NEWLINE
+
+    if ($logLevel -ne "off") {
+        # Winspect's own Get-LogFilePath names its log after Winspect's own script path - now that
+        # Winspect is bundled *inside* AyfieInspector's package, that lands its log one directory
+        # deeper (AyfieInspector\Winspect\Invoke-Winspect.log) than where AyfieInspector's own log
+        # and report end up. Relocated here so both logs are always found in the same place,
+        # regardless of internal packaging structure the user shouldn't need to know about.
+        $winspectLogPath = $winspectPath.Replace(".ps1", ".log")
+        if (Test-Path $winspectLogPath) {
+            $targetLogPath = Join-Path (Split-Path $SCRIPT_PATH -Parent) (Split-Path $winspectLogPath -Leaf)
+            try {
+                Move-Item -Path $winspectLogPath -Destination $targetLogPath -Force
+                Write-Host "Relocated Winspect's log -> $targetLogPath"
+            } catch {
+                Write-Warning "Could not relocate Winspect's log from '$winspectLogPath' to '$targetLogPath': $_"
+            }
+        }
+    }
 
     Write-Host "Querying rule engine at $dashboardApiRootUrl/rules ..."
     $allRules = @()
@@ -219,6 +243,8 @@ function Start-AyfieInspector() {
     if ($TERMINAL_OUTPUTS -contains $outputDestination) {
         Write-Output $fullReport
     }
+
+    Write-InfoLog "################### Tool execution completed ###################"
 }
 
 Start-AyfieInspector
