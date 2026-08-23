@@ -7,7 +7,7 @@ consistent view of what's actually configured on a given Ayfie Index installatio
 customizations, search refiners, the scheduled restart task, and outbound connectivity — without
 having to piece it together from several different admin surfaces by hand.
 
-> **Status:** early, actively developed (v0.3.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.3.1). The current release covers the rule engine,
 > custom refiners, the Solr document count, the scheduled restart task, and an outbound firewall
 > connectivity check.
 
@@ -73,6 +73,36 @@ having to piece it together from several different admin surfaces by hand.
 ## Sample output
 
 ```
+#################### FIREWALL OPENINGS #####################
+Reachable sites:
+    github.com
+    docker.io
+    hub.docker.com
+Non-reachable sites:
+    example-non-reachable-site.com
+Alternate sites:
+    Reachable: alternate-cdn-example.net
+    Non-reachable: alternate-cdn-example.org
+
+#################### SCHEDULED RESTART #####################
+Task name: Restart-Saga
+Task execution time: Every Sunday at 03:00
+Task command: .\stop-saga.ps1 .\saga.ps1 -Quiet -AcceptEula
+Task user: ayfie
+
+######################## SOLR INFO #########################
+Source reference count: 842,315
+
+##################### CUSTOM REFINERS ######################
+Refiners:
+    Department
+        RefinerName: Department
+        FieldName: via_ssimd_department
+        FacetType: FacetField
+        SelectionLimit: 1000
+        Enabled: True
+        SortOrder: 5
+
 #################### CUSTOM INDEX RULES ####################
 Rules:
     Custom Metadata Mapping
@@ -101,40 +131,10 @@ Rules:
 ################### CUSTOM SEARCH RULES ####################
 Rules:
     No rules found
-
-##################### CUSTOM REFINERS ######################
-Refiners:
-    Department
-        RefinerName: Department
-        FieldName: via_ssimd_department
-        FacetType: FacetField
-        SelectionLimit: 1000
-        Enabled: True
-        SortOrder: 5
-
-######################## SOLR INFO #########################
-Source reference count: 842,315
-
-#################### SCHEDULED RESTART #####################
-Task name: Restart-Saga
-Task execution time: Every Sunday at 03:00
-Task command: .\stop-saga.ps1 .\saga.ps1 -Quiet -AcceptEula
-Task user: ayfie
-
-#################### FIREWALL OPENINGS #####################
-Reachable sites:
-    github.com
-    docker.io
-    hub.docker.com
-Non-reachable sites:
-    example-non-reachable-site.com
-Alternate sites:
-    Reachable: alternate-cdn-example.net
-    Non-reachable: alternate-cdn-example.org
 ```
 
-(The Winspect-generated sections — REPORT INFO, HOST IDENTITY, NETWORK, SYSTEM RESOURCES, RESOURCE
-USAGE, CERTIFICATES — appear first in the actual report; see
+(The Winspect-generated sections — REPORT INFO, CERTIFICATES, HOST IDENTITY, NETWORK, SYSTEM
+RESOURCES, RESOURCE USAGE — appear first in the actual report; see
 [Winspect's own README](https://github.com/mortendj/winspect#sample-output) for what those look
 like.)
 

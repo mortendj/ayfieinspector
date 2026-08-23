@@ -254,6 +254,25 @@ function Start-AyfieInspector() {
         }
     }
 
+    # Section order deliberately mirrors ConfigInspector's own importance-first ordering (short,
+    # urgent/actionable facts before large, rarely-searched-for dumps) - firewall/schedule/count
+    # first, then refiners, then the potentially large rule definitions last.
+    if ($skipFirewallCheck) {
+        Write-Host "Skipping firewall openings check (-skipFirewallCheck)..."
+    } else {
+        Write-Host "Checking firewall openings (this can take a while)..."
+    }
+    $newSectionsRaw = Get-FirewallOpeningsReportSection
+
+    Write-Host "Checking the scheduled restart task ..."
+    $newSectionsRaw += Get-ScheduledRestartReportSection
+
+    Write-Host "Querying source reference count at $dashboardApiRootUrl/sourcereference/count ..."
+    $newSectionsRaw += Get-SolrInfoReportSection $dashboardApiRootUrl
+
+    Write-Host "Querying custom refiners at $dashboardApiRootUrl/refiners ..."
+    $newSectionsRaw += Get-CustomRefinersReportSection $dashboardApiRootUrl
+
     Write-Host "Querying rule engine at $dashboardApiRootUrl/rules ..."
     $allRules = @()
     try {
@@ -266,23 +285,7 @@ function Start-AyfieInspector() {
     # report. Development-inserted and connector-installation rules carry other RuleType values
     # and are deliberately excluded here (unlike the raw, unfiltered one-off dump tool).
     $customRules = @($allRules | Where-Object { $_.RuleType -eq "custom" })
-    $newSectionsRaw = Get-CustomRulesReportSections $customRules
-
-    Write-Host "Querying custom refiners at $dashboardApiRootUrl/refiners ..."
-    $newSectionsRaw += Get-CustomRefinersReportSection $dashboardApiRootUrl
-
-    Write-Host "Querying source reference count at $dashboardApiRootUrl/sourcereference/count ..."
-    $newSectionsRaw += Get-SolrInfoReportSection $dashboardApiRootUrl
-
-    Write-Host "Checking the scheduled restart task ..."
-    $newSectionsRaw += Get-ScheduledRestartReportSection
-
-    if ($skipFirewallCheck) {
-        Write-Host "Skipping firewall openings check (-skipFirewallCheck)..."
-    } else {
-        Write-Host "Checking firewall openings (this can take a while)..."
-    }
-    $newSectionsRaw += Get-FirewallOpeningsReportSection
+    $newSectionsRaw += Get-CustomRulesReportSections $customRules
 
     # Reuse Winspect's own bolding/finalization pass on the new sections, via "terminal" so it
     # only returns formatted text here rather than writing a stray winspect-report.* file - the
