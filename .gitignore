@@ -3,6 +3,7 @@ ayfieinspector-report.txt
 ayfieinspector-report.md
 ayfieinspector-report.html
 *.log
+testResults.xml
 
 # Build output
 dist/

@@ -7,7 +7,7 @@ consistent view of what's actually configured on a given Ayfie Index installatio
 customizations, search refiners, the scheduled restart task, and outbound connectivity — without
 having to piece it together from several different admin surfaces by hand.
 
-> **Status:** early, actively developed (v0.3.1). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.4.0). The current release covers the rule engine,
 > custom refiners, the Solr document count, the scheduled restart task, and an outbound firewall
 > connectivity check.
 
@@ -152,7 +152,7 @@ Winspect is bundled right alongside it, so nothing else needs to be installed se
 ## Project layout
 
 ```
-Invoke-AyfieInspector.ps1        entry point: parameter declarations, runs Winspect, adds Ayfie sections
+Invoke-AyfieInspector.ps1        entry point: parameter declarations, dot-sources src/, kicks off the run
 Build-AyfieInspectorPackage.ps1  packages a release zip with Winspect bundled inside
 src/
   Constants.ps1                  version info, default refiners, restart task name, firewall URLs
@@ -161,7 +161,23 @@ src/
   RefinerInfo.ps1                custom refiners - fetch and summarize
   ScheduledTaskInfo.ps1          scheduled restart task - fetch and summarize
   FirewallInfo.ps1               outbound connectivity check
+  MainOrchestration.ps1          builds each report section and assembles the combined report
 ```
+
+## Running tests
+
+Tests use [Pester](https://pester.dev/) 5.x:
+
+```powershell
+Invoke-Pester -Path .\Tests
+```
+
+The suite mirrors Winspect's own layering: plain unit tests for pure functions (formatting,
+weekday/time parsing, URL parsing), tests that mock only the real boundary (the Dashboard API call,
+`Get-ScheduledTask`, `Test-NetConnection`/`Invoke-WebRequest`) and run the actual logic on top,
+tests for the report-section-assembly functions, and a final end-to-end smoke test that runs the
+real entry point with no mocks at all, asserting on section order and output shape rather than
+exact values.
 
 ## Contributing
 
