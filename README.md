@@ -167,3 +167,7 @@ This is an early-stage personal project, but issues and pull requests are welcom
 ## Author
 
 Morten Johnsen — [github.com/mortendj](https://github.com/mortendj)
+
+## License
+
+[MIT](LICENSE)
