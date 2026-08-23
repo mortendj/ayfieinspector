@@ -11,6 +11,9 @@ having to piece it together from several different admin surfaces by hand.
 > custom refiners, the Solr document count, the scheduled restart task, and an outbound firewall
 > connectivity check.
 
+> **Independent, unofficial project.** Not affiliated with, endorsed by, or sponsored by Ayfie
+> Group. "Ayfie", "Ayfie Index", and "Ayfie Locator" are trademarks of their respective owner.
+
 ## Features
 
 - **Custom rule engine rules:** every rule actually entered via the rule editor (not
