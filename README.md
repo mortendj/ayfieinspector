@@ -8,7 +8,7 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.7.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.8.0). The current release covers the rule engine,
 > custom refiners, the Solr document count, the scheduled restart task, an outbound firewall
 > connectivity check, and the Saga gateway certificate.
 
@@ -155,11 +155,12 @@ Rules:
 ```
 
 (The Winspect-generated sections — REPORT INFO (with an added `AyfieInspector version` line right
-alongside Winspect's own), CERTIFICATES, ADDITIONAL CERTIFICATE (the Saga gateway certificate -
-hostname and file both resolved by AyfieInspector and passed through to Winspect, which checks the
-hostname live over HTTPS first and only falls back to the file if that's unreachable, always
-stating which one actually produced the result), HOST IDENTITY, NETWORK, SYSTEM RESOURCES,
-RESOURCE USAGE — appear first in the actual report; see
+alongside Winspect's own), CERTIFICATES, SAGA CERTIFICATE (Winspect's generic "additional
+certificate" check, given AyfieInspector's own section title — hostname and file both resolved by
+AyfieInspector and passed through to Winspect, which checks the hostname live over HTTPS first and
+only falls back to the file if that's unreachable, always stating which one actually produced the
+result), HOST IDENTITY, NETWORK, SYSTEM RESOURCES, RESOURCE USAGE — appear first in the actual
+report; see
 [Winspect's own README](https://github.com/mortendj/winspect#sample-output) for what those look
 like.)
 

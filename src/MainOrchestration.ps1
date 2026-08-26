@@ -172,7 +172,7 @@ function Start-AyfieInspector() {
     }
 
     Write-Host "Running Winspect ($winspectPath) for generic host facts..."
-    $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel -certificateFilePath $resolvedCertificateFilePath -certificateHostname $resolvedCertificateHostname
+    $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel -certificateFilePath $resolvedCertificateFilePath -certificateHostname $resolvedCertificateHostname -certificateSectionLabel "SAGA CERTIFICATE"
     $winspectReportText = $winspectReportLines -join $PHYSICAL_NEWLINE
     $winspectReportText = Add-AyfieInspectorVersionToReportInfo $winspectReportText
 
