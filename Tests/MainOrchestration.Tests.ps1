@@ -33,25 +33,25 @@ Describe "Add-AyfieInspectorVersionToReportInfo" {
     # never which AyfieInspector version - confirmed as a real gap on a production run (KTH,
     # 2026-08-26), since the Ayfie-specific sections below REPORT INFO have no other attribution.
 
-    It "inserts an AyfieInspector version line directly after Winspect's own Script version line" {
+    It "inserts an AyfieInspector version line directly after Winspect's own Winspect version line" {
         $winspectReportText = @(
             "####################### REPORT INFO ########################",
             "Local time: 2026-08-26 17:16:02",
             "User: kth-search-prod\prod-ayfie-admin",
-            "Script version: Winspect v. 0.8.0 (2026-08-23)",
+            "Winspect version: 0.10.0 (2026-08-26)",
             "Running elevated: Yes"
         ) -join $PHYSICAL_NEWLINE
 
         $result = Add-AyfieInspectorVersionToReportInfo $winspectReportText
         $resultLines = @($result -split $PHYSICAL_NEWLINE)
 
-        $scriptVersionIndex = [array]::IndexOf($resultLines, "Script version: Winspect v. 0.8.0 (2026-08-23)")
-        $scriptVersionIndex | Should -BeGreaterThan -1
-        $resultLines[$scriptVersionIndex + 1] | Should -Match "^AyfieInspector version: $([regex]::Escape($AYFIE_INSPECTOR_VERSION))"
-        $resultLines[$scriptVersionIndex + 2] | Should -Be "Running elevated: Yes"
+        $winspectVersionIndex = [array]::IndexOf($resultLines, "Winspect version: 0.10.0 (2026-08-26)")
+        $winspectVersionIndex | Should -BeGreaterThan -1
+        $resultLines[$winspectVersionIndex + 1] | Should -Match "^AyfieInspector version: $([regex]::Escape($AYFIE_INSPECTOR_VERSION))"
+        $resultLines[$winspectVersionIndex + 2] | Should -Be "Running elevated: Yes"
     }
 
-    It "returns the original text unchanged if Winspect's Script version line can't be found" {
+    It "returns the original text unchanged if Winspect's Winspect version line can't be found" {
         $winspectReportText = @("Some unrelated report text", "with no version line at all") -join $PHYSICAL_NEWLINE
 
         Add-AyfieInspectorVersionToReportInfo $winspectReportText | Should -Be $winspectReportText

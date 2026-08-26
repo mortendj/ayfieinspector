@@ -121,21 +121,21 @@ function Add-AyfieInspectorVersionToReportInfo($winspectReportText) {
     $versionLineFormatted = (Complete-Report $versionLineRaw) -join $PHYSICAL_NEWLINE
 
     $lines = @($winspectReportText -split $PHYSICAL_NEWLINE)
-    $scriptVersionLineIndex = -1
+    $winspectVersionLineIndex = -1
     for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($lines[$i] -match "Script version") {
-            $scriptVersionLineIndex = $i
+        if ($lines[$i] -match "Winspect version") {
+            $winspectVersionLineIndex = $i
             break
         }
     }
-    if ($scriptVersionLineIndex -eq -1) {
+    if ($winspectVersionLineIndex -eq -1) {
         # Winspect's own wording changed underneath this - degrade to the unmodified report rather
         # than mis-splicing the version line into the wrong place.
-        Write-WarningLog "Could not find Winspect's 'Script version' line to splice the AyfieInspector version line after"
+        Write-WarningLog "Could not find Winspect's 'Winspect version' line to splice the AyfieInspector version line after"
         Write-ReturnValue $winspectReportText
     } else {
-        $linesBefore = $lines[0..$scriptVersionLineIndex]
-        $linesAfter = if ($scriptVersionLineIndex -lt $lines.Count - 1) { $lines[($scriptVersionLineIndex + 1)..($lines.Count - 1)] } else { @() }
+        $linesBefore = $lines[0..$winspectVersionLineIndex]
+        $linesAfter = if ($winspectVersionLineIndex -lt $lines.Count - 1) { $lines[($winspectVersionLineIndex + 1)..($lines.Count - 1)] } else { @() }
         $newLines = $linesBefore + $versionLineFormatted + $linesAfter
         Write-ReturnValue ($newLines -join $PHYSICAL_NEWLINE)
     }
