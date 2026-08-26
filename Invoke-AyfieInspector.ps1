@@ -49,6 +49,14 @@ per script), named after each script the same way Winspect names its own.
 Skips the outbound connectivity check (~15 URLs Ayfie/Saga itself needs reachable) - useful to
 avoid the added time when firewall state is already known or hasn't changed since the last run.
 
+.PARAMETER certificateFilePath
+Path to the Saga gateway certificate file. By default this is auto-discovered (via the running
+licensing container's install directory and its .env file), so this only needs to be set explicitly
+when checking a host before Saga is installed there - with no install directory yet, auto-discovery
+has nothing to find. Passed through to Winspect as its own -certificateFilePath, giving the combined
+report a dedicated section for the actual gateway certificate alongside Winspect's generic
+certificate-store scan.
+
 .EXAMPLE
 .\Invoke-AyfieInspector.ps1
 Produces a combined Winspect + Ayfie custom-rules report, to the terminal and to a file.
@@ -79,7 +87,9 @@ param(
     [ValidateSet("trace", "debug", "info", "warning", "error", "off")]
     [string]$logLevel = "off",
 
-    [switch]$skipFirewallCheck
+    [switch]$skipFirewallCheck,
+
+    [string]$certificateFilePath = ""
 )
 
 if (-not (Test-Path $winspectPath)) {
@@ -105,6 +115,7 @@ $SCRIPT_PATH = $PSCommandPath
 . (Join-Path $SRC_DIR "RefinerInfo.ps1")
 . (Join-Path $SRC_DIR "ScheduledTaskInfo.ps1")
 . (Join-Path $SRC_DIR "FirewallInfo.ps1")
+. (Join-Path $SRC_DIR "SagaCertificateInfo.ps1")
 . (Join-Path $SRC_DIR "MainOrchestration.ps1")
 
 Start-AyfieInspector

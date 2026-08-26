@@ -29,6 +29,13 @@ $DEFAULT_REFINERS = @(
     "TaskCompleted"
 )
 
+################## GATEWAY CERTIFICATE ##################
+
+$LICENSING_CONTAINER_NAME    = "ayfie-saga-licensing"
+$DOT_ENV_RELATIVE_PATH       = "docker/.env"
+$SSL_CERTIFICATE_DIR         = "volumes/Traefik/certs"
+$GATEWAY_CERTIFICATE_NAME_KEY = "AYFIE_SAGA_GATEWAY_CERTIFICATE_NAME"
+
 ################## SCHEDULED RESTART ##################
 
 $RESTART_TASK_NAME = "Restart-Saga"

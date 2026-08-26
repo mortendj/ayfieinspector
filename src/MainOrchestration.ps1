@@ -124,8 +124,16 @@ function Start-AyfieInspector() {
     $script:cmdline_param_OUTPUT_FORMAT = $outputFormat
     Initialize-OutputFormatLayout $outputFormat
 
+    Write-Host "Resolving the Saga gateway certificate path..."
+    $resolvedCertificateFilePath = ""
+    try {
+        $resolvedCertificateFilePath = Get-SagaGatewayCertificateFilePath $certificateFilePath
+    } catch {
+        Write-Warning "Could not resolve the Saga gateway certificate path: $_"
+    }
+
     Write-Host "Running Winspect ($winspectPath) for generic host facts..."
-    $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel
+    $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel -certificateFilePath $resolvedCertificateFilePath
     $winspectReportText = $winspectReportLines -join $PHYSICAL_NEWLINE
 
     if ($logLevel -ne "off") {
