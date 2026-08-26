@@ -6,29 +6,56 @@ BeforeAll {
     . "$PSScriptRoot/../../Winspect/src/Utilities.ps1"
     . "$PSScriptRoot/../src/Constants.ps1"
     . "$PSScriptRoot/../src/SagaCertificateInfo.ps1"
+
+    function New-DockerInspectLines($mountSources) {
+        # Mimics real `docker inspect` output: a one-element JSON array, pretty-printed across
+        # multiple lines, returned as an array of lines - exactly what Invoke-ExternalCommand's
+        # Get-Content-based capture hands back, not a single JSON string.
+        $mounts = @($mountSources | ForEach-Object { [pscustomobject]@{ Source = $_ } })
+        $containerConfig = @([pscustomobject]@{ Mounts = $mounts })
+        $json = $containerConfig | ConvertTo-Json -Depth 5
+        return ,@($json -split "`n")
+    }
 }
 
 Describe "Get-SagaInstallDirPath" {
     It "derives the install directory as the common prefix of two bind mount sources" {
         Mock Invoke-ExternalCommand {
-            '{"Mounts":[{"Source":"C:\\Saga\\docker\\volumes\\a"},{"Source":"C:\\Saga\\docker\\volumes\\b"}]}'
+            New-DockerInspectLines @("C:\Saga\docker\volumes\a", "C:\Saga\docker\volumes\b")
         }
 
         Get-SagaInstallDirPath | Should -Be "C:\Saga\docker\volumes\"
     }
 
     It "returns null when the container has fewer than two mounts to compare" {
-        Mock Invoke-ExternalCommand { '{"Mounts":[{"Source":"C:\\Saga\\docker\\volumes\\a"}]}' }
+        Mock Invoke-ExternalCommand { New-DockerInspectLines @("C:\Saga\docker\volumes\a") }
 
         Get-SagaInstallDirPath | Should -BeNullOrEmpty
     }
 
     It "does not hang when both mount sources are identical" {
         Mock Invoke-ExternalCommand {
-            '{"Mounts":[{"Source":"C:\\Saga\\docker\\volumes\\a"},{"Source":"C:\\Saga\\docker\\volumes\\a"}]}'
+            New-DockerInspectLines @("C:\Saga\docker\volumes\a", "C:\Saga\docker\volumes\a")
         }
 
         Get-SagaInstallDirPath | Should -Be "C:\Saga\docker\volumes\a"
+    }
+
+    It "never passes an argument containing whitespace to Invoke-ExternalCommand" {
+        # Regression test for a real bug found on a production host: Invoke-ExternalCommand passes
+        # each argument straight to Start-Process -ArgumentList, which splits on internal whitespace
+        # rather than quoting it - a template argument like "{{json .}}" arrived at docker broken
+        # into two garbled arguments, and docker rejected it as "template parsing error: template:
+        # :1: unclosed action". No argument here may contain a space.
+        Mock Invoke-ExternalCommand {
+            param($commandName, $commandArgs)
+            foreach ($arg in $commandArgs) {
+                $arg | Should -Not -Match ' '
+            }
+            New-DockerInspectLines @("C:\Saga\docker\volumes\a", "C:\Saga\docker\volumes\b")
+        }
+
+        Get-SagaInstallDirPath | Out-Null
     }
 }
 
