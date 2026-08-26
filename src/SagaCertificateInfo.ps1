@@ -40,17 +40,27 @@ function Get-DotEnvValue($dotEnvFilePath, $key) {
     Write-ReturnValue $value
 }
 
-function Get-SagaGatewayCertificateFilePath($certificateFilePathOverride) {
+function Get-SagaGatewayCertificateInfo($certificateFilePathOverride) {
     Write-FunctionCallLog $PSBoundParameters
-    # An explicit override is needed for the pre-installation case (checking a host before Saga is
-    # actually installed there) - with no install directory yet, auto-discovery has nothing to find.
+    # An explicit file override is needed for the pre-installation case (checking a host before
+    # Saga is actually installed there) - with no running install yet, there's no install
+    # directory to auto-discover from, and no live gateway to reach either, so this stays
+    # file-only rather than also trying (and failing) a live hostname check against nothing.
     if ($certificateFilePathOverride -ne "") {
-        $certificateFilePath = $certificateFilePathOverride
+        $certificateInfo = [pscustomobject]@{
+            CertificateFilePath = $certificateFilePathOverride
+            CertificateHostname = ""
+        }
     } else {
         $installDirPath = Get-SagaInstallDirPath
         $dotEnvFilePath = Join-Path $installDirPath $DOT_ENV_RELATIVE_PATH
         $certificateName = Get-DotEnvValue $dotEnvFilePath $GATEWAY_CERTIFICATE_NAME_KEY
         $certificateFilePath = Join-Path $installDirPath (Join-Path $SSL_CERTIFICATE_DIR "$certificateName.crt")
+        $certificateHostname = Get-DotEnvValue $dotEnvFilePath $GATEWAY_HOSTNAME_KEY
+        $certificateInfo = [pscustomobject]@{
+            CertificateFilePath = $certificateFilePath
+            CertificateHostname = $certificateHostname
+        }
     }
-    Write-ReturnValue $certificateFilePath
+    Write-ReturnValue $certificateInfo
 }

@@ -8,7 +8,7 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.6.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.7.0). The current release covers the rule engine,
 > custom refiners, the Solr document count, the scheduled restart task, an outbound firewall
 > connectivity check, and the Saga gateway certificate.
 
@@ -31,8 +31,12 @@ by hand.
   endpoints where only one of the two needs to be reachable.
 - **Saga gateway certificate:** identifies and reports the expiration of the actual Ayfie/Saga
   gateway certificate — a file-backed certificate the generic Windows certificate store scan below
-  can never see. Auto-discovered from the running installation by default; can be pointed at an
-  explicit file instead for checking a host before Saga is even installed.
+  can never see. Checked live over HTTPS against the configured gateway hostname by default (proof
+  of what's actually being served right now, auto-discovered from the running installation's
+  `.env`), falling back to the certificate file itself if the live endpoint isn't reachable (e.g.
+  Saga is stopped) — the report always states which of the two actually produced the result. Can
+  be pointed at an explicit file instead (skipping the live check entirely) for checking a host
+  before Saga is even installed.
 - **Generic host facts:** everything Winspect itself reports — host identity, network adapters,
   CPU/RAM/disk capacity and usage, and certificate expirations — included in the same combined
   report, with an `AyfieInspector version` line added next to Winspect's own version line so a
@@ -50,9 +54,13 @@ by hand.
 - Windows, with Windows PowerShell 5.1 or PowerShell 7+.
 - Run elevated (as Administrator) to get real disk speed/latency numbers in the Winspect portion
   of the report.
-- Docker CLI access, to auto-discover the gateway certificate's location from the running
-  installation. Not needed if `-certificateFilePath` is given explicitly instead (e.g. checking a
-  host before Saga is installed, when there's no running installation to discover from).
+- Docker CLI access, to auto-discover the gateway certificate's file location and the configured
+  gateway hostname from the running installation's `.env`. Not needed if `-certificateFilePath` is
+  given explicitly instead (e.g. checking a host before Saga is installed, when there's no running
+  installation to discover from).
+- Outbound network access to the gateway hostname on port 443, for the live HTTPS certificate
+  check. Not required - the check falls back to the certificate file if the endpoint can't be
+  reached, and says so in the report.
 
 ## Usage
 
@@ -80,7 +88,7 @@ by hand.
 | `-dashboardApiRootUrl` | URL | `http://localhost/Dashboard/api` | Root URL for the rule engine, refiner, and Solr count checks. |
 | `-logLevel` | `trace`, `debug`, `info`, `warning`, `error`, `off` | `off` | Logging verbosity. |
 | `-skipFirewallCheck` | switch | off | Skip the outbound connectivity check (adds noticeable time otherwise). |
-| `-certificateFilePath` | path | auto-discovered | Path to the Saga gateway certificate file; only needed to override auto-discovery, e.g. when checking a host before Saga is installed. |
+| `-certificateFilePath` | path | auto-discovered | Path to the Saga gateway certificate file; only needed to override auto-discovery, e.g. when checking a host before Saga is installed. Setting this skips the live HTTPS check entirely (no gateway hostname is resolved). |
 | `-winspectPath` | path | auto-detected | Path to Winspect's entry script; only needed if it's not where AyfieInspector expects it. |
 
 ## Sample output
@@ -147,9 +155,11 @@ Rules:
 ```
 
 (The Winspect-generated sections — REPORT INFO (with an added `AyfieInspector version` line right
-alongside Winspect's own), CERTIFICATES, ADDITIONAL CERTIFICATE (the Saga gateway certificate,
-resolved by AyfieInspector and passed through to Winspect), HOST IDENTITY, NETWORK, SYSTEM
-RESOURCES, RESOURCE USAGE — appear first in the actual report; see
+alongside Winspect's own), CERTIFICATES, ADDITIONAL CERTIFICATE (the Saga gateway certificate -
+hostname and file both resolved by AyfieInspector and passed through to Winspect, which checks the
+hostname live over HTTPS first and only falls back to the file if that's unreachable, always
+stating which one actually produced the result), HOST IDENTITY, NETWORK, SYSTEM RESOURCES,
+RESOURCE USAGE — appear first in the actual report; see
 [Winspect's own README](https://github.com/mortendj/winspect#sample-output) for what those look
 like.)
 

@@ -50,12 +50,14 @@ Skips the outbound connectivity check (~15 URLs Ayfie/Saga itself needs reachabl
 avoid the added time when firewall state is already known or hasn't changed since the last run.
 
 .PARAMETER certificateFilePath
-Path to the Saga gateway certificate file. By default this is auto-discovered (via the running
-licensing container's install directory and its .env file), so this only needs to be set explicitly
-when checking a host before Saga is installed there - with no install directory yet, auto-discovery
-has nothing to find. Passed through to Winspect as its own -certificateFilePath, giving the combined
-report a dedicated section for the actual gateway certificate alongside Winspect's generic
-certificate-store scan.
+Path to the Saga gateway certificate file. By default the certificate is checked live over HTTPS
+against the configured gateway hostname (auto-discovered from the running licensing container's
+install directory and its .env file) - the real proof of what's actually being served - and this
+file is only used if that live check fails (e.g. Saga is stopped). Set this explicitly only when
+checking a host before Saga is installed there - with no running install yet, there's no live
+gateway to reach and no install directory to auto-discover from, so the check becomes file-only.
+Passed through to Winspect, giving the combined report a dedicated section for the actual gateway
+certificate alongside Winspect's generic certificate-store scan.
 
 .EXAMPLE
 .\Invoke-AyfieInspector.ps1

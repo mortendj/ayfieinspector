@@ -75,17 +75,27 @@ Describe "Get-DotEnvValue" {
     }
 }
 
-Describe "Get-SagaGatewayCertificateFilePath" {
-    It "returns the override as-is when one is given, without touching docker at all" {
+Describe "Get-SagaGatewayCertificateInfo" {
+    It "returns the file override as-is and no hostname at all, without touching docker" {
         Mock Get-SagaInstallDirPath { throw "should not be called" }
 
-        Get-SagaGatewayCertificateFilePath "C:\explicit\gateway.crt" | Should -Be "C:\explicit\gateway.crt"
+        $result = Get-SagaGatewayCertificateInfo "C:\explicit\gateway.crt"
+
+        $result.CertificateFilePath | Should -Be "C:\explicit\gateway.crt"
+        $result.CertificateHostname | Should -Be ""
     }
 
-    It "auto-discovers the certificate path from the install directory and .env when no override is given" {
+    It "auto-discovers both the certificate path and the gateway hostname from the install directory and .env when no override is given" {
         Mock Get-SagaInstallDirPath { "C:\Saga\" }
-        Mock Get-DotEnvValue { "gateway" }
+        Mock Get-DotEnvValue {
+            param($dotEnvFilePath, $key)
+            if ($key -eq $GATEWAY_CERTIFICATE_NAME_KEY) { "gateway" }
+            elseif ($key -eq $GATEWAY_HOSTNAME_KEY) { "search.customer.example.com" }
+        }
 
-        Get-SagaGatewayCertificateFilePath "" | Should -Be "C:\Saga\volumes\Traefik\certs\gateway.crt"
+        $result = Get-SagaGatewayCertificateInfo ""
+
+        $result.CertificateFilePath | Should -Be "C:\Saga\volumes\Traefik\certs\gateway.crt"
+        $result.CertificateHostname | Should -Be "search.customer.example.com"
     }
 }
