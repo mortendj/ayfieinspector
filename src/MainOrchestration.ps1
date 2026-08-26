@@ -110,6 +110,37 @@ function Get-FirewallOpeningsReportSection() {
     return New-SectionOutput "FIREWALL OPENINGS" $lineScriptBlocks
 }
 
+function Add-AyfieInspectorVersionToReportInfo($winspectReportText) {
+    Write-FunctionCallLog $PSBoundParameters
+    # Winspect's REPORT INFO section only ever prints its own version - the combined report is
+    # otherwise silent about which AyfieInspector version actually produced the Ayfie-specific
+    # sections below it, making a saved report impossible to attribute to a release. Spliced in
+    # here as plain text surgery on Winspect's already-rendered output (rather than teaching
+    # Winspect anything about AyfieInspector) to keep Winspect itself completely product-agnostic.
+    $versionLineRaw = "AyfieInspector version$FIELD_LABEL_SEPARATOR$AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
+    $versionLineFormatted = (Complete-Report $versionLineRaw) -join $PHYSICAL_NEWLINE
+
+    $lines = @($winspectReportText -split $PHYSICAL_NEWLINE)
+    $scriptVersionLineIndex = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match "Script version") {
+            $scriptVersionLineIndex = $i
+            break
+        }
+    }
+    if ($scriptVersionLineIndex -eq -1) {
+        # Winspect's own wording changed underneath this - degrade to the unmodified report rather
+        # than mis-splicing the version line into the wrong place.
+        Write-WarningLog "Could not find Winspect's 'Script version' line to splice the AyfieInspector version line after"
+        Write-ReturnValue $winspectReportText
+    } else {
+        $linesBefore = $lines[0..$scriptVersionLineIndex]
+        $linesAfter = if ($scriptVersionLineIndex -lt $lines.Count - 1) { $lines[($scriptVersionLineIndex + 1)..($lines.Count - 1)] } else { @() }
+        $newLines = $linesBefore + $versionLineFormatted + $linesAfter
+        Write-ReturnValue ($newLines -join $PHYSICAL_NEWLINE)
+    }
+}
+
 function Start-AyfieInspector() {
     # Mirrors Winspect's own Start-Winspect exactly (Remove-ExistingLogs + start/end INFO banners) -
     # without this, the log only ever contained DEBUG-level function-call entries from the reused
@@ -120,8 +151,13 @@ function Start-AyfieInspector() {
     # Get-SectionHeader/Complete-Report (dot-sourced from Winspect) read these two by that exact
     # name as script-scope globals - $script: is required here so the assignment actually lands in
     # the shared scope those functions see, rather than a function-local shadow only this function
-    # would see.
+    # would see. OUTPUT_DESTINATION is pinned to "terminal" for the whole run (not just the real
+    # -outputDestination the user asked for) so every Complete-Report call below - both for the
+    # version-line splice and for AyfieInspector's own new sections - returns formatted text rather
+    # than writing a stray winspect-report.* file; the actual single combined-report file is written
+    # once, at the very end, honoring the real $outputDestination.
     $script:cmdline_param_OUTPUT_FORMAT = $outputFormat
+    $script:cmdline_param_OUTPUT_DESTINATION = "terminal"
     Initialize-OutputFormatLayout $outputFormat
 
     Write-Host "Resolving the Saga gateway certificate path..."
@@ -135,6 +171,7 @@ function Start-AyfieInspector() {
     Write-Host "Running Winspect ($winspectPath) for generic host facts..."
     $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel -certificateFilePath $resolvedCertificateFilePath
     $winspectReportText = $winspectReportLines -join $PHYSICAL_NEWLINE
+    $winspectReportText = Add-AyfieInspectorVersionToReportInfo $winspectReportText
 
     if ($logLevel -ne "off") {
         # Winspect's own Get-LogFilePath names its log after Winspect's own script path - now that
@@ -187,11 +224,11 @@ function Start-AyfieInspector() {
     $customRules = @($allRules | Where-Object { $_.RuleType -eq "custom" })
     $newSectionsRaw += Get-CustomRulesReportSections $customRules
 
-    # Reuse Winspect's own bolding/finalization pass on the new sections, via "terminal" so it
-    # only returns formatted text here rather than writing a stray winspect-report.* file - the
-    # actual single combined-report file is written below instead, honoring the real
-    # -outputDestination the user asked for.
-    $script:cmdline_param_OUTPUT_DESTINATION = "terminal"
+    # Reuse Winspect's own bolding/finalization pass on the new sections (OUTPUT_DESTINATION is
+    # already pinned to "terminal" from the top of this function, so this only returns formatted
+    # text here rather than writing a stray winspect-report.* file - the actual single
+    # combined-report file is written below instead, honoring the real -outputDestination the user
+    # asked for).
     $formattedNewSectionLines = Complete-Report $newSectionsRaw
     $newSectionsText = $formattedNewSectionLines -join $PHYSICAL_NEWLINE
 

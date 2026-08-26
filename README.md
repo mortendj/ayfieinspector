@@ -8,7 +8,7 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.5.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.6.0). The current release covers the rule engine,
 > custom refiners, the Solr document count, the scheduled restart task, an outbound firewall
 > connectivity check, and the Saga gateway certificate.
 
@@ -35,7 +35,8 @@ by hand.
   explicit file instead for checking a host before Saga is even installed.
 - **Generic host facts:** everything Winspect itself reports — host identity, network adapters,
   CPU/RAM/disk capacity and usage, and certificate expirations — included in the same combined
-  report.
+  report, with an `AyfieInspector version` line added next to Winspect's own version line so a
+  saved report is always attributable to the exact release that produced it.
 - **Output formats:** plain text, Markdown, or HTML.
 - **Output destinations:** terminal, a report file, or both.
 - **Structured logging:** off by default, configurable up to trace-level detail. Writes two log
@@ -145,9 +146,10 @@ Rules:
     No rules found
 ```
 
-(The Winspect-generated sections — REPORT INFO, CERTIFICATES, ADDITIONAL CERTIFICATE (the Saga
-gateway certificate, resolved by AyfieInspector and passed through to Winspect), HOST IDENTITY,
-NETWORK, SYSTEM RESOURCES, RESOURCE USAGE — appear first in the actual report; see
+(The Winspect-generated sections — REPORT INFO (with an added `AyfieInspector version` line right
+alongside Winspect's own), CERTIFICATES, ADDITIONAL CERTIFICATE (the Saga gateway certificate,
+resolved by AyfieInspector and passed through to Winspect), HOST IDENTITY, NETWORK, SYSTEM
+RESOURCES, RESOURCE USAGE — appear first in the actual report; see
 [Winspect's own README](https://github.com/mortendj/winspect#sample-output) for what those look
 like.)
 

@@ -13,9 +13,10 @@ BeforeAll {
     . "$PSScriptRoot/../src/FirewallInfo.ps1"
     . "$PSScriptRoot/../src/MainOrchestration.ps1"
 
-    # New-SectionOutput/Get-SectionHeader (dot-sourced above) need these set the same way
-    # Start-AyfieInspector itself sets them before building any section.
+    # New-SectionOutput/Get-SectionHeader/Complete-Report (dot-sourced above) need these set the
+    # same way Start-AyfieInspector itself sets them before building any section.
     $cmdline_param_OUTPUT_FORMAT = "text"
+    $cmdline_param_OUTPUT_DESTINATION = "terminal"
     Initialize-OutputFormatLayout "text"
 
     function New-FakeRule($ruleName, $ruleType, $targetRunner) {
@@ -24,6 +25,36 @@ BeforeAll {
             LastModifiedDate = "2026-01-01T00:00:00Z"; ConnectorTypeId = $null
             TargetRunner = $targetRunner; Definition = "<rules></rules>"
         }
+    }
+}
+
+Describe "Add-AyfieInspectorVersionToReportInfo" {
+    # Regression test: the combined report only ever showed which Winspect version produced it,
+    # never which AyfieInspector version - confirmed as a real gap on a production run (KTH,
+    # 2026-08-26), since the Ayfie-specific sections below REPORT INFO have no other attribution.
+
+    It "inserts an AyfieInspector version line directly after Winspect's own Script version line" {
+        $winspectReportText = @(
+            "####################### REPORT INFO ########################",
+            "Local time: 2026-08-26 17:16:02",
+            "User: kth-search-prod\prod-ayfie-admin",
+            "Script version: Winspect v. 0.8.0 (2026-08-23)",
+            "Running elevated: Yes"
+        ) -join $PHYSICAL_NEWLINE
+
+        $result = Add-AyfieInspectorVersionToReportInfo $winspectReportText
+        $resultLines = @($result -split $PHYSICAL_NEWLINE)
+
+        $scriptVersionIndex = [array]::IndexOf($resultLines, "Script version: Winspect v. 0.8.0 (2026-08-23)")
+        $scriptVersionIndex | Should -BeGreaterThan -1
+        $resultLines[$scriptVersionIndex + 1] | Should -Match "^AyfieInspector version: $([regex]::Escape($AYFIE_INSPECTOR_VERSION))"
+        $resultLines[$scriptVersionIndex + 2] | Should -Be "Running elevated: Yes"
+    }
+
+    It "returns the original text unchanged if Winspect's Script version line can't be found" {
+        $winspectReportText = @("Some unrelated report text", "with no version line at all") -join $PHYSICAL_NEWLINE
+
+        Add-AyfieInspectorVersionToReportInfo $winspectReportText | Should -Be $winspectReportText
     }
 }
 
