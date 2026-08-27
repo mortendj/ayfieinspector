@@ -3,7 +3,7 @@
 # Named distinctly from Winspect's own $SCRIPT_VERSION/$SCRIPT_NAME (Constants.ps1) - Invoke-
 # AyfieInspector.ps1 dot-sources Winspect's Constants.ps1 too, and those names are already claimed
 # there.
-$AYFIE_INSPECTOR_VERSION           = "0.11.0"
+$AYFIE_INSPECTOR_VERSION           = "0.12.0"
 $AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-27"
 $AYFIE_INSPECTOR_NAME              = "AyfieInspector"
 $AYFIE_INSPECTOR_VERSION_STRING    = "$AYFIE_INSPECTOR_NAME v. $AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
@@ -42,7 +42,12 @@ $GATEWAY_HOSTNAME_KEY         = "AYFIE_SAGA_HOST_NAME"
 $AUTHORITY_DB_CONTAINER_NAME        = "ayfie-saga-authority-db"
 $SAGA_REALM_NAME                    = "saga"
 $IDENTITY_PROVIDER_TABLE            = "public.identity_provider"
-$USER_FEDERATION_PROVIDER_TABLE     = "public.user_federation_provider"
+# Modern Keycloak stores LDAP/AD user federation as a row in the generic public.component table
+# (provider_type = org.keycloak.storage.UserStorageProvider), not in the older dedicated
+# public.user_federation_provider table - confirmed empty on a real host that has LDAP genuinely
+# configured, while public.component correctly has exactly one matching row there.
+$COMPONENT_TABLE                    = "public.component"
+$USER_STORAGE_PROVIDER_TYPE         = "org.keycloak.storage.UserStorageProvider"
 $IDENTITY_PROVIDER_AUTH_METHOD_NAME = "Entra ID"
 $USER_FEDERATION_AUTH_METHOD_NAME   = "Active Directory"
 

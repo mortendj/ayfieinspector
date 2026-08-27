@@ -8,7 +8,7 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.11.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.12.0). The current release covers the rule engine,
 > custom refiners, the Solr document count, the scheduled restart task, an outbound firewall
 > connectivity check, the Saga gateway certificate, and the authentication method.
 

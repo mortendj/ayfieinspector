@@ -1,6 +1,10 @@
-function Get-ProviderCount($providerTable, $realmIdExpression) {
+function Get-ProviderCount($providerTable, $realmIdExpression, $additionalWhereClause = "") {
     Write-FunctionCallLog $PSBoundParameters
-    $sql = "SELECT COUNT(*) FROM $providerTable WHERE realm_id = ($realmIdExpression);"
+    $sql = "SELECT COUNT(*) FROM $providerTable WHERE realm_id = ($realmIdExpression)"
+    if ($additionalWhereClause -ne "") {
+        $sql += " AND $additionalWhereClause"
+    }
+    $sql += ";"
     # -t (tuples only) -A (unaligned) makes psql print just the bare count on its own line, rather
     # than a padded ASCII table whose header/separator/row positions would otherwise have to be
     # assumed - more robust than depending on a specific line index in psql's default output.
@@ -16,7 +20,7 @@ function Get-IdentityProviderCount() {
 
 function Get-UserFederationProviderCount() {
     Write-FunctionCallLog $PSBoundParameters
-    Write-ReturnValue (Get-ProviderCount $USER_FEDERATION_PROVIDER_TABLE "'$SAGA_REALM_NAME'")
+    Write-ReturnValue (Get-ProviderCount $COMPONENT_TABLE "SELECT id FROM public.realm WHERE name = '$SAGA_REALM_NAME'" "provider_type = '$USER_STORAGE_PROVIDER_TYPE'")
 }
 
 function Get-AuthenticationMethodSummary() {

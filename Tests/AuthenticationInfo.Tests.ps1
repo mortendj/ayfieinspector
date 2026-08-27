@@ -39,6 +39,42 @@ Describe "Get-ProviderCount" {
 
         ($script:capturedArgs | Where-Object { $_ -match "SELECT" }).Count | Should -Be 1
     }
+
+    It "includes the additional WHERE clause in the query when one is given" {
+        $script:capturedArgs = $null
+        Mock Invoke-ExternalCommand {
+            param($commandName, $commandArgs)
+            $script:capturedArgs = $commandArgs
+            @("1")
+        }
+
+        Get-ProviderCount "public.component" "'realm-id'" "provider_type = 'org.keycloak.storage.UserStorageProvider'" | Out-Null
+
+        ($script:capturedArgs -join " ") | Should -Match "AND provider_type = 'org\.keycloak\.storage\.UserStorageProvider'"
+    }
+}
+
+Describe "Get-UserFederationProviderCount" {
+    It "queries public.component filtered to UserStorageProvider rows, not the legacy user_federation_provider table" {
+        # Regression test for a real finding on a customer host: modern Keycloak stores LDAP/AD
+        # federation as a row in the generic public.component table (provider_type =
+        # org.keycloak.storage.UserStorageProvider), not in the older dedicated
+        # public.user_federation_provider table - confirmed empty on a host that has LDAP genuinely
+        # configured, while public.component correctly had exactly one matching row there.
+        $script:capturedArgs = $null
+        Mock Invoke-ExternalCommand {
+            param($commandName, $commandArgs)
+            $script:capturedArgs = $commandArgs
+            @("1")
+        }
+
+        Get-UserFederationProviderCount | Should -Be 1
+
+        $capturedSql = @($script:capturedArgs | Where-Object { $_ -match "SELECT" })[0]
+        $capturedSql | Should -Match "FROM public\.component "
+        $capturedSql | Should -Match "provider_type = 'org\.keycloak\.storage\.UserStorageProvider'"
+        $capturedSql | Should -Not -Match "user_federation_provider"
+    }
 }
 
 Describe "Get-AuthenticationMethodSummary" {
