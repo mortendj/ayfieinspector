@@ -8,7 +8,7 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.9.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.10.0). The current release covers the rule engine,
 > custom refiners, the Solr document count, the scheduled restart task, an outbound firewall
 > connectivity check, and the Saga gateway certificate.
 
@@ -31,12 +31,16 @@ by hand.
   endpoints where only one of the two needs to be reachable.
 - **Saga gateway certificate:** identifies and reports the expiration of the actual Ayfie/Saga
   gateway certificate — a file-backed certificate the generic Windows certificate store scan below
-  can never see. Checked live over HTTPS against the configured gateway hostname by default (proof
-  of what's actually being served right now, auto-discovered from the running installation's
-  `.env`), falling back to the certificate file itself if the live endpoint isn't reachable (e.g.
-  Saga is stopped) — the report always states which of the two actually produced the result. Can
-  be pointed at an explicit file instead (skipping the live check entirely) for checking a host
-  before Saga is even installed.
+  can never see. Checked both live over HTTPS against the configured gateway hostname (proof of
+  what's actually being served right now, auto-discovered from the running installation's `.env`)
+  and against the certificate file itself, with their issuers compared: a match reports one clean
+  line, a mismatch is flagged explicitly with both certificates shown side by side. The most common
+  real cause of a mismatch is a local TLS-inspecting security proxy silently re-signing outbound
+  HTTPS on the host - confirmed on a real customer host, where the live check alone would have
+  reported the proxy's substituted certificate as if it were genuine. Falls back to whichever check
+  succeeds if the other's endpoint/file isn't reachable (e.g. Saga is stopped). Can be pointed at
+  an explicit file instead (skipping the live check entirely) for checking a host before Saga is
+  even installed.
 - **Generic host facts:** everything Winspect itself reports — host identity, network adapters,
   CPU/RAM/disk capacity and usage, and certificate expirations — included in the same combined
   report, with an `AyfieInspector version` line added next to Winspect's own version line so a
