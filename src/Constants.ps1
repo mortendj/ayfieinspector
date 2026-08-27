@@ -3,7 +3,7 @@
 # Named distinctly from Winspect's own $SCRIPT_VERSION/$SCRIPT_NAME (Constants.ps1) - Invoke-
 # AyfieInspector.ps1 dot-sources Winspect's Constants.ps1 too, and those names are already claimed
 # there.
-$AYFIE_INSPECTOR_VERSION           = "0.13.0"
+$AYFIE_INSPECTOR_VERSION           = "0.14.0"
 $AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-27"
 $AYFIE_INSPECTOR_NAME              = "AyfieInspector"
 $AYFIE_INSPECTOR_VERSION_STRING    = "$AYFIE_INSPECTOR_NAME v. $AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
@@ -52,6 +52,25 @@ $COMPONENT_TABLE                    = "public.component"
 $USER_STORAGE_PROVIDER_TYPE         = "org.keycloak.storage.UserStorageProvider"
 $IDENTITY_PROVIDER_AUTH_METHOD_NAME = "Entra ID"
 $USER_FEDERATION_AUTH_METHOD_NAME   = "Active Directory"
+
+################## OS SUPPORT ##################
+
+# Which Windows Server versions Ayfie Index (Saga) is qualified to run on - reported as a warning,
+# not a blocker, unlike the older tool this check is ported from (which throws and aborts an
+# unrelated RSAT feature-installation step for any OS not on this list).
+$WINDOWS_SERVER_2019 = 'Windows Server 2019'
+$WINDOWS_SERVER_2022 = 'Windows Server 2022'
+$WINDOWS_SERVER_2025 = 'Windows Server 2025'
+$SUPPORTED_OS        = @(
+    $WINDOWS_SERVER_2019,
+    $WINDOWS_SERVER_2022,
+    $WINDOWS_SERVER_2025
+)
+
+################## CUSTOM.ENV FILE CONTENT ##################
+
+$CUSTOM_ENV_RELATIVE_PATH = "docker/custom.env"
+$SENSITIVE_ENV_TOKENS     = @("PASSWORD", "SECRET", "API_KEY", "API_TOKEN")
 
 ################## SCHEDULED RESTART ##################
 

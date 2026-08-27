@@ -8,10 +8,11 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.13.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.14.0). The current release covers the rule engine,
 > custom refiners, the Solr document count, the scheduled restart task, an outbound firewall
-> connectivity check, the Saga gateway certificate, the authentication method, and basic
-> installation info (install directory, Saga version, branding, gateway hostname).
+> connectivity check, the Saga gateway certificate, the authentication method, basic installation
+> info (install directory, Saga version, branding, gateway hostname, OS support status), and the
+> redacted `custom.env` file content.
 
 > **Independent, unofficial project.** Not affiliated with, endorsed by, or sponsored by Ayfie
 > Group. "Ayfie", "Ayfie Index", and "Ayfie Locator" are trademarks of their respective owner.
@@ -36,7 +37,13 @@ by hand.
   during setup, confirmed on real customer hosts — rather than treating it as an error.
 - **Saga info:** install directory, Saga version, branding, and the configured gateway hostname —
   auto-discovered from the running installation the same way the gateway certificate check already
-  is, so this adds no extra Docker calls of its own.
+  is, so this adds no extra Docker calls of its own. Also reports whether the host's OS is one
+  Ayfie Index (Saga) is actually qualified to run on, as an informational warning rather than a
+  blocker — unlike the internal tool this check is ported from, an unsupported OS here never
+  prevents the rest of the report from running.
+- **Custom.env file content:** the `custom.env` overrides file, with values for any key matching a
+  sensitive-naming convention (`PASSWORD`, `SECRET`, `API_KEY`, `API_TOKEN`) dropped entirely rather
+  than shown or masked.
 - **Saga gateway certificate:** identifies and reports the expiration of the actual Ayfie/Saga
   gateway certificate — a file-backed certificate the generic Windows certificate store scan below
   can never see. Checked both live over HTTPS against the configured gateway hostname (proof of
@@ -125,6 +132,11 @@ Install directory: d:\program files\ayfie\saga\
 Saga version: 7.19.0
 Branding: ayfie
 Gateway hostname: engine.example.com
+OS supported by Saga: Supported
+
+################# CUSTOM.ENV FILE CONTENT ##################
+AYFIE_SAGA_BRANDING_KEY=ayfie
+AYFIE_SAGA_HOST_NAME=engine.example.com
 
 #################### SCHEDULED RESTART #####################
 Task name: Restart-Saga

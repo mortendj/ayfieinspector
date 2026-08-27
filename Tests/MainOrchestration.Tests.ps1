@@ -5,6 +5,8 @@ BeforeAll {
     . "$PSScriptRoot/../../Winspect/src/Logging.ps1"
     . "$PSScriptRoot/../../Winspect/src/Utilities.ps1"
     . "$PSScriptRoot/../../Winspect/src/ReportFormatting.ps1"
+    . "$PSScriptRoot/../../Winspect/src/SystemQuery.ps1"
+    . "$PSScriptRoot/../../Winspect/src/HostIdentity.ps1"
     . "$PSScriptRoot/../src/Constants.ps1"
     . "$PSScriptRoot/../src/DashboardApi.ps1"
     . "$PSScriptRoot/../src/RuleEngineInfo.ps1"
@@ -14,6 +16,7 @@ BeforeAll {
     . "$PSScriptRoot/../src/AuthenticationInfo.ps1"
     . "$PSScriptRoot/../src/SagaCertificateInfo.ps1"
     . "$PSScriptRoot/../src/SagaInfo.ps1"
+    . "$PSScriptRoot/../src/EnvFileInfo.ps1"
     . "$PSScriptRoot/../src/MainOrchestration.ps1"
 
     # New-SectionOutput/Get-SectionHeader/Complete-Report (dot-sourced above) need these set the
@@ -220,6 +223,10 @@ Describe "Get-AuthenticationMethodReportSection" {
 }
 
 Describe "Get-SagaInfoReportSection" {
+    BeforeEach {
+        Mock Get-OperatingSystemVersion { "Windows Server 2022 Standard (10.0.20348, build 20348)" }
+    }
+
     It "includes the install directory, Saga version, branding, and gateway hostname when all are available" {
         Mock Get-SagaVersion { "7.19.0" }
         Mock Get-DotEnvValue { "custom" }
@@ -255,5 +262,61 @@ Describe "Get-SagaInfoReportSection" {
 
         $result | Should -Match "Saga version.*Unavailable"
         $result | Should -Match "Branding.*ayfie"
+    }
+
+    It "reports 'Supported' when the detected OS is on Saga's supported list" {
+        Mock Get-SagaVersion { "7.19.0" }
+        Mock Get-DotEnvValue { "custom" }
+
+        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com"
+
+        $result | Should -Match "OS supported by Saga.*Supported"
+    }
+
+    It "reports a warning (not a blocking error) when the detected OS is not on Saga's supported list" {
+        Mock Get-OperatingSystemVersion { "Windows Server 2016 Standard (10.0.14393, build 14393)" }
+        Mock Get-SagaVersion { "7.19.0" }
+        Mock Get-DotEnvValue { "custom" }
+
+        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com"
+
+        $result | Should -Match "OS supported by Saga.*WARNING.*not a version supported by Ayfie Index \(Saga\)"
+    }
+
+    It "reports 'Unavailable' for OS support if the OS itself can't be determined" {
+        Mock Get-OperatingSystemVersion { throw "WMI unavailable" }
+        Mock Get-SagaVersion { "7.19.0" }
+        Mock Get-DotEnvValue { "custom" }
+
+        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com"
+
+        $result | Should -Match "OS supported by Saga.*Unavailable"
+    }
+}
+
+Describe "Get-CustomEnvFileReportSection" {
+    It "includes the redacted custom.env content under a CUSTOM.ENV FILE CONTENT heading" {
+        Mock Get-CustomEnvFileContent { "AYFIE_SAGA_BRANDING_KEY=custom" }
+
+        $result = Get-CustomEnvFileReportSection "C:\Saga\"
+
+        $result | Should -Match "CUSTOM\.ENV FILE CONTENT"
+        $result | Should -Match "AYFIE_SAGA_BRANDING_KEY=custom"
+    }
+
+    It "reports 'Unavailable' when the install directory couldn't be resolved" {
+        Mock Get-CustomEnvFileContent { throw "should not be called" }
+
+        $result = Get-CustomEnvFileReportSection ""
+
+        $result | Should -Match "Unavailable"
+    }
+
+    It "degrades gracefully to 'Unavailable' when reading the file fails" {
+        Mock Get-CustomEnvFileContent { throw "access denied" }
+
+        $result = Get-CustomEnvFileReportSection "C:\Saga\"
+
+        $result | Should -Match "Unavailable"
     }
 }

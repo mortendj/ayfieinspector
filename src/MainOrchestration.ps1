@@ -119,6 +119,7 @@ function Get-SagaInfoReportSection($installDirPath, $gatewayHostname) {
     $sagaVersion = "Unavailable"
     $branding = "Unavailable"
     $gatewayHostnameDisplay = "Unavailable"
+    $osSupportSummary = "Unavailable"
 
     if ($installDirPath -ne "") {
         $installDirDisplay = $installDirPath
@@ -137,6 +138,11 @@ function Get-SagaInfoReportSection($installDirPath, $gatewayHostname) {
     if ($gatewayHostname -ne "") {
         $gatewayHostnameDisplay = $gatewayHostname
     }
+    try {
+        $osSupportSummary = Get-OsSupportSummary (Get-OperatingSystemVersion)
+    } catch {
+        Write-Warning "Failed to determine OS support status: $_"
+    }
 
     # Plain (unclosed) scriptblocks - see the SOLR INFO note above for why GetNewClosure() would be
     # wrong, not just unnecessary, here.
@@ -144,9 +150,27 @@ function Get-SagaInfoReportSection($installDirPath, $gatewayHostname) {
         { "Install directory$FIELD_LABEL_SEPARATOR$installDirDisplay" },
         { "Saga version$FIELD_LABEL_SEPARATOR$sagaVersion" },
         { "Branding$FIELD_LABEL_SEPARATOR$branding" },
-        { "Gateway hostname$FIELD_LABEL_SEPARATOR$gatewayHostnameDisplay" }
+        { "Gateway hostname$FIELD_LABEL_SEPARATOR$gatewayHostnameDisplay" },
+        { "OS supported by Saga$FIELD_LABEL_SEPARATOR$osSupportSummary" }
     )
     return New-SectionOutput "SAGA INFO" $lineScriptBlocks
+}
+
+function Get-CustomEnvFileReportSection($installDirPath) {
+    $customEnvFileContent = "Unavailable"
+    if ($installDirPath -ne "") {
+        try {
+            $customEnvFileContent = Get-CustomEnvFileContent $installDirPath
+        } catch {
+            Write-Warning "Failed to read the custom.env file content: $_"
+        }
+    }
+    # Plain (unclosed) scriptblock - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "$customEnvFileContent" }
+    )
+    return New-SectionOutput "CUSTOM.ENV FILE CONTENT" $lineScriptBlocks
 }
 
 function Get-AuthenticationMethodReportSection() {
@@ -264,6 +288,9 @@ function Start-AyfieInspector() {
     $newSectionsRaw += Get-AuthenticationMethodReportSection
 
     $newSectionsRaw += Get-SagaInfoReportSection $resolvedInstallDirPath $resolvedCertificateHostname
+
+    Write-Host "Reading custom.env file content..."
+    $newSectionsRaw += Get-CustomEnvFileReportSection $resolvedInstallDirPath
 
     Write-Host "Checking the scheduled restart task ..."
     $newSectionsRaw += Get-ScheduledRestartReportSection
