@@ -11,6 +11,7 @@ BeforeAll {
     . "$PSScriptRoot/../src/RefinerInfo.ps1"
     . "$PSScriptRoot/../src/ScheduledTaskInfo.ps1"
     . "$PSScriptRoot/../src/FirewallInfo.ps1"
+    . "$PSScriptRoot/../src/AuthenticationInfo.ps1"
     . "$PSScriptRoot/../src/MainOrchestration.ps1"
 
     # New-SectionOutput/Get-SectionHeader/Complete-Report (dot-sourced above) need these set the
@@ -194,5 +195,24 @@ Describe "Get-FirewallOpeningsReportSection" {
         $result = Get-FirewallOpeningsReportSection
 
         $result | Should -Match "example\.com"
+    }
+}
+
+Describe "Get-AuthenticationMethodReportSection" {
+    It "includes the authentication method under an AUTHENTICATION METHOD heading" {
+        Mock Get-AuthenticationMethodSummary { "Entra ID" }
+
+        $result = Get-AuthenticationMethodReportSection
+
+        $result | Should -Match "AUTHENTICATION METHOD"
+        $result | Should -Match "Entra ID"
+    }
+
+    It "degrades gracefully (no crash, 'Unavailable') when the check itself fails" {
+        Mock Get-AuthenticationMethodSummary { throw "docker exec failed" }
+
+        $result = Get-AuthenticationMethodReportSection
+
+        $result | Should -Match "Unavailable"
     }
 }

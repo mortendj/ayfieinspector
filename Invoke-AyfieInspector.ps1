@@ -118,6 +118,7 @@ $SCRIPT_PATH = $PSCommandPath
 . (Join-Path $SRC_DIR "ScheduledTaskInfo.ps1")
 . (Join-Path $SRC_DIR "FirewallInfo.ps1")
 . (Join-Path $SRC_DIR "SagaCertificateInfo.ps1")
+. (Join-Path $SRC_DIR "AuthenticationInfo.ps1")
 . (Join-Path $SRC_DIR "MainOrchestration.ps1")
 
 Start-AyfieInspector

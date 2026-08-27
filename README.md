@@ -8,9 +8,9 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.10.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.11.0). The current release covers the rule engine,
 > custom refiners, the Solr document count, the scheduled restart task, an outbound firewall
-> connectivity check, and the Saga gateway certificate.
+> connectivity check, the Saga gateway certificate, and the authentication method.
 
 > **Independent, unofficial project.** Not affiliated with, endorsed by, or sponsored by Ayfie
 > Group. "Ayfie", "Ayfie Index", and "Ayfie Locator" are trademarks of their respective owner.
@@ -29,6 +29,10 @@ by hand.
 - **Outbound firewall openings:** which of the external endpoints an Ayfie Index installation
   needs reachable actually are, reported separately from a couple of interchangeable "alternate"
   endpoints where only one of the two needs to be reachable.
+- **Authentication method:** whether this installation is set up for Entra ID (identity provider)
+  or Active Directory (user federation), queried directly from Keycloak's own database. Reports a
+  clean "Not configured" for a genuinely unconfigured deployment — a legitimate, common state
+  during setup, confirmed on real customer hosts — rather than treating it as an error.
 - **Saga gateway certificate:** identifies and reports the expiration of the actual Ayfie/Saga
   gateway certificate — a file-backed certificate the generic Windows certificate store scan below
   can never see. Checked both live over HTTPS against the configured gateway hostname (proof of

@@ -110,6 +110,21 @@ function Get-FirewallOpeningsReportSection() {
     return New-SectionOutput "FIREWALL OPENINGS" $lineScriptBlocks
 }
 
+function Get-AuthenticationMethodReportSection() {
+    $authenticationMethodSummary = "Unavailable"
+    try {
+        $authenticationMethodSummary = Get-AuthenticationMethodSummary
+    } catch {
+        Write-Warning "Failed to determine the authentication method: $_"
+    }
+    # Plain (unclosed) scriptblock - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "Authentication method$FIELD_LABEL_SEPARATOR$authenticationMethodSummary" }
+    )
+    return New-SectionOutput "AUTHENTICATION METHOD" $lineScriptBlocks
+}
+
 function Add-AyfieInspectorVersionToReportInfo($winspectReportText) {
     Write-FunctionCallLog $PSBoundParameters
     # Winspect's REPORT INFO section only ever prints its own version - the combined report is
@@ -194,15 +209,18 @@ function Start-AyfieInspector() {
         }
     }
 
-    # Section order deliberately mirrors ConfigInspector's own importance-first ordering (short,
-    # urgent/actionable facts before large, rarely-searched-for dumps) - firewall/schedule/count
-    # first, then refiners, then the potentially large rule definitions last.
+    # Section order is deliberately importance-first: short, urgent/actionable facts before large,
+    # rarely-searched-for dumps - firewall/schedule/count first, then refiners, then the
+    # potentially large rule definitions last.
     if ($skipFirewallCheck) {
         Write-Host "Skipping firewall openings check (-skipFirewallCheck)..."
     } else {
         Write-Host "Checking firewall openings (this can take a while)..."
     }
     $newSectionsRaw = Get-FirewallOpeningsReportSection
+
+    Write-Host "Determining the authentication method..."
+    $newSectionsRaw += Get-AuthenticationMethodReportSection
 
     Write-Host "Checking the scheduled restart task ..."
     $newSectionsRaw += Get-ScheduledRestartReportSection
