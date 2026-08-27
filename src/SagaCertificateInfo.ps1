@@ -42,6 +42,11 @@ function Get-DotEnvValue($dotEnvFilePath, $key) {
 
 function Get-SagaGatewayCertificateInfo($certificateFilePathOverride) {
     Write-FunctionCallLog $PSBoundParameters
+    # Also returns InstallDirPath - not just certificate info - so that Get-SagaInstallDirPath's
+    # docker inspect call (the expensive part) only ever needs to run once per run, with other
+    # installation facts (SAGA INFO's install directory/version/branding) reusing this same
+    # resolution rather than triggering their own redundant docker inspect.
+    #
     # An explicit file override is needed for the pre-installation case (checking a host before
     # Saga is actually installed there) - with no running install yet, there's no install
     # directory to auto-discover from, and no live gateway to reach either, so this stays
@@ -50,6 +55,7 @@ function Get-SagaGatewayCertificateInfo($certificateFilePathOverride) {
         $certificateInfo = [pscustomobject]@{
             CertificateFilePath = $certificateFilePathOverride
             CertificateHostname = ""
+            InstallDirPath      = ""
         }
     } else {
         $installDirPath = Get-SagaInstallDirPath
@@ -60,6 +66,7 @@ function Get-SagaGatewayCertificateInfo($certificateFilePathOverride) {
         $certificateInfo = [pscustomobject]@{
             CertificateFilePath = $certificateFilePath
             CertificateHostname = $certificateHostname
+            InstallDirPath      = $installDirPath
         }
     }
     Write-ReturnValue $certificateInfo

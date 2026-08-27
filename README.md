@@ -8,9 +8,10 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.12.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.13.0). The current release covers the rule engine,
 > custom refiners, the Solr document count, the scheduled restart task, an outbound firewall
-> connectivity check, the Saga gateway certificate, and the authentication method.
+> connectivity check, the Saga gateway certificate, the authentication method, and basic
+> installation info (install directory, Saga version, branding, gateway hostname).
 
 > **Independent, unofficial project.** Not affiliated with, endorsed by, or sponsored by Ayfie
 > Group. "Ayfie", "Ayfie Index", and "Ayfie Locator" are trademarks of their respective owner.
@@ -33,6 +34,9 @@ by hand.
   or Active Directory (user federation), queried directly from Keycloak's own database. Reports a
   clean "Not configured" for a genuinely unconfigured deployment — a legitimate, common state
   during setup, confirmed on real customer hosts — rather than treating it as an error.
+- **Saga info:** install directory, Saga version, branding, and the configured gateway hostname —
+  auto-discovered from the running installation the same way the gateway certificate check already
+  is, so this adds no extra Docker calls of its own.
 - **Saga gateway certificate:** identifies and reports the expiration of the actual Ayfie/Saga
   gateway certificate — a file-backed certificate the generic Windows certificate store scan below
   can never see. Checked both live over HTTPS against the configured gateway hostname (proof of
@@ -112,6 +116,15 @@ Non-reachable sites:
 Alternate sites:
     Reachable: alternate-cdn-example.net
     Non-reachable: alternate-cdn-example.org
+
+################## AUTHENTICATION METHOD ###################
+Authentication method: Entra ID
+
+######################## SAGA INFO #########################
+Install directory: d:\program files\ayfie\saga\
+Saga version: 7.19.0
+Branding: ayfie
+Gateway hostname: engine.example.com
 
 #################### SCHEDULED RESTART #####################
 Task name: Restart-Saga
@@ -196,6 +209,8 @@ src/
   ScheduledTaskInfo.ps1          scheduled restart task - fetch and summarize
   FirewallInfo.ps1               outbound connectivity check
   SagaCertificateInfo.ps1        Saga gateway certificate path - auto-discovery and override
+  AuthenticationInfo.ps1         identity provider / user federation provider counts from Keycloak
+  SagaInfo.ps1                   Saga version from git.version
   MainOrchestration.ps1          builds each report section and assembles the combined report
 ```
 

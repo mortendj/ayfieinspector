@@ -83,6 +83,7 @@ Describe "Get-SagaGatewayCertificateInfo" {
 
         $result.CertificateFilePath | Should -Be "C:\explicit\gateway.crt"
         $result.CertificateHostname | Should -Be ""
+        $result.InstallDirPath | Should -Be ""
     }
 
     It "auto-discovers both the certificate path and the gateway hostname from the install directory and .env when no override is given" {
@@ -97,5 +98,6 @@ Describe "Get-SagaGatewayCertificateInfo" {
 
         $result.CertificateFilePath | Should -Be "C:\Saga\volumes\Traefik\certs\gateway.crt"
         $result.CertificateHostname | Should -Be "search.customer.example.com"
+        $result.InstallDirPath | Should -Be "C:\Saga\"
     }
 }

@@ -110,6 +110,45 @@ function Get-FirewallOpeningsReportSection() {
     return New-SectionOutput "FIREWALL OPENINGS" $lineScriptBlocks
 }
 
+function Get-SagaInfoReportSection($installDirPath, $gatewayHostname) {
+    # Reuses installDirPath/gatewayHostname already resolved once for the gateway certificate
+    # check (see Get-SagaGatewayCertificateInfo) rather than re-discovering them here - both are
+    # simply "Unavailable" when that resolution failed or was skipped (the pre-installation
+    # override case), matching every other section's degrade pattern.
+    $installDirDisplay = "Unavailable"
+    $sagaVersion = "Unavailable"
+    $branding = "Unavailable"
+    $gatewayHostnameDisplay = "Unavailable"
+
+    if ($installDirPath -ne "") {
+        $installDirDisplay = $installDirPath
+        try {
+            $sagaVersion = Get-SagaVersion $installDirPath
+        } catch {
+            Write-Warning "Failed to determine the Saga version: $_"
+        }
+        try {
+            $dotEnvFilePath = Join-Path $installDirPath $DOT_ENV_RELATIVE_PATH
+            $branding = Get-DotEnvValue $dotEnvFilePath $BRANDING_KEY
+        } catch {
+            Write-Warning "Failed to determine the Saga branding: $_"
+        }
+    }
+    if ($gatewayHostname -ne "") {
+        $gatewayHostnameDisplay = $gatewayHostname
+    }
+
+    # Plain (unclosed) scriptblocks - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "Install directory$FIELD_LABEL_SEPARATOR$installDirDisplay" },
+        { "Saga version$FIELD_LABEL_SEPARATOR$sagaVersion" },
+        { "Branding$FIELD_LABEL_SEPARATOR$branding" },
+        { "Gateway hostname$FIELD_LABEL_SEPARATOR$gatewayHostnameDisplay" }
+    )
+    return New-SectionOutput "SAGA INFO" $lineScriptBlocks
+}
+
 function Get-AuthenticationMethodReportSection() {
     $authenticationMethodSummary = "Unavailable"
     try {
@@ -178,10 +217,12 @@ function Start-AyfieInspector() {
     Write-Host "Resolving the Saga gateway certificate info..."
     $resolvedCertificateFilePath = ""
     $resolvedCertificateHostname = ""
+    $resolvedInstallDirPath = ""
     try {
         $certificateInfo = Get-SagaGatewayCertificateInfo $certificateFilePath
         $resolvedCertificateFilePath = $certificateInfo.CertificateFilePath
         $resolvedCertificateHostname = $certificateInfo.CertificateHostname
+        $resolvedInstallDirPath = $certificateInfo.InstallDirPath
     } catch {
         Write-Warning "Could not resolve the Saga gateway certificate info: $_"
     }
@@ -221,6 +262,8 @@ function Start-AyfieInspector() {
 
     Write-Host "Determining the authentication method..."
     $newSectionsRaw += Get-AuthenticationMethodReportSection
+
+    $newSectionsRaw += Get-SagaInfoReportSection $resolvedInstallDirPath $resolvedCertificateHostname
 
     Write-Host "Checking the scheduled restart task ..."
     $newSectionsRaw += Get-ScheduledRestartReportSection

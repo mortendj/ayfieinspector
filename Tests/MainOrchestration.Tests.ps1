@@ -12,6 +12,8 @@ BeforeAll {
     . "$PSScriptRoot/../src/ScheduledTaskInfo.ps1"
     . "$PSScriptRoot/../src/FirewallInfo.ps1"
     . "$PSScriptRoot/../src/AuthenticationInfo.ps1"
+    . "$PSScriptRoot/../src/SagaCertificateInfo.ps1"
+    . "$PSScriptRoot/../src/SagaInfo.ps1"
     . "$PSScriptRoot/../src/MainOrchestration.ps1"
 
     # New-SectionOutput/Get-SectionHeader/Complete-Report (dot-sourced above) need these set the
@@ -214,5 +216,44 @@ Describe "Get-AuthenticationMethodReportSection" {
         $result = Get-AuthenticationMethodReportSection
 
         $result | Should -Match "Unavailable"
+    }
+}
+
+Describe "Get-SagaInfoReportSection" {
+    It "includes the install directory, Saga version, branding, and gateway hostname when all are available" {
+        Mock Get-SagaVersion { "7.19.0" }
+        Mock Get-DotEnvValue { "custom" }
+
+        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com"
+
+        $result | Should -Match "SAGA INFO"
+        $result | Should -Match "Install directory.*C:\\Saga\\"
+        $result | Should -Match "Saga version.*7\.19\.0"
+        $result | Should -Match "Branding.*custom"
+        $result | Should -Match "Gateway hostname.*engine\.example\.com"
+    }
+
+    It "reports every field as 'Unavailable' when the install directory couldn't be resolved" {
+        # Matches the pre-installation override case (no running install to discover facts from)
+        # and the case where Get-SagaGatewayCertificateInfo itself failed entirely.
+        Mock Get-SagaVersion { throw "should not be called" }
+        Mock Get-DotEnvValue { throw "should not be called" }
+
+        $result = Get-SagaInfoReportSection "" ""
+
+        $result | Should -Match "Install directory.*Unavailable"
+        $result | Should -Match "Saga version.*Unavailable"
+        $result | Should -Match "Branding.*Unavailable"
+        $result | Should -Match "Gateway hostname.*Unavailable"
+    }
+
+    It "degrades the version and branding fields independently when the install directory is known but one lookup fails" {
+        Mock Get-SagaVersion { throw "git.version not found" }
+        Mock Get-DotEnvValue { "ayfie" }
+
+        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com"
+
+        $result | Should -Match "Saga version.*Unavailable"
+        $result | Should -Match "Branding.*ayfie"
     }
 }
