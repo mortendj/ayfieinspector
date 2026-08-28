@@ -33,6 +33,20 @@ Describe "Get-EnvFileKeyValuePairs" {
     }
 }
 
+Describe "Remove-SensitiveDotEnvKeys" {
+    It "drops keys matching a sensitive token from the dictionary, keeping the rest intact" {
+        $keyValuePairs = [ordered]@{
+            AYFIE_SAGA_DATABASE_PASSWORD = "hunter2"
+            AYFIE_SAGA_BRANDING_KEY = "custom"
+        }
+
+        $result = Remove-SensitiveDotEnvKeys $keyValuePairs @("PASSWORD")
+
+        $result.Contains("AYFIE_SAGA_DATABASE_PASSWORD") | Should -BeFalse
+        $result["AYFIE_SAGA_BRANDING_KEY"] | Should -Be "custom"
+    }
+}
+
 Describe "Get-SecurityClearedEnvFileContent" {
     It "drops keys matching a sensitive token entirely, rather than masking the value" {
         $envFilePath = Join-Path $TestDrive "with-secrets.env"

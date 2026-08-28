@@ -17,6 +17,7 @@ BeforeAll {
     . "$PSScriptRoot/../src/SagaCertificateInfo.ps1"
     . "$PSScriptRoot/../src/SagaInfo.ps1"
     . "$PSScriptRoot/../src/EnvFileInfo.ps1"
+    . "$PSScriptRoot/../src/EnvConfigDiffInfo.ps1"
     . "$PSScriptRoot/../src/ConnectorApi.ps1"
     . "$PSScriptRoot/../src/DataSourceConnectionInfo.ps1"
     . "$PSScriptRoot/../src/DatabaseInfo.ps1"
@@ -736,5 +737,38 @@ Describe "Get-CustomEnvFileReportSection" {
         $result = Get-CustomEnvFileReportSection "C:\Saga\"
 
         $result | Should -Match "Unavailable"
+    }
+}
+
+Describe "Get-TemporaryEnvFileChangesReportSection" {
+    It "includes removed, added, and modified variables under the section heading" {
+        Mock Get-EnvConfigDiff {
+            [pscustomobject]@{ Removed = "AYFIE_REMOVED_VAR"; Added = "AYFIE_ADDED_VAR (new)"; Modified = "AYFIE_SAGA_BRANDING_KEY (custom)" }
+        }
+
+        $result = Get-TemporaryEnvFileChangesReportSection "C:\Saga\"
+
+        $result | Should -Match "TEMPORARY \.ENV FILE CHANGES"
+        $result | Should -Match "Removed variables.*AYFIE_REMOVED_VAR"
+        $result | Should -Match "Added variables.*AYFIE_ADDED_VAR \(new\)"
+        $result | Should -Match "Modified variables.*AYFIE_SAGA_BRANDING_KEY \(custom\)"
+    }
+
+    It "reports 'Unavailable' for all three fields when the install directory couldn't be resolved" {
+        Mock Get-EnvConfigDiff { throw "should not be called" }
+
+        $result = Get-TemporaryEnvFileChangesReportSection ""
+
+        $result | Should -Match "Removed variables.*Unavailable"
+        $result | Should -Match "Added variables.*Unavailable"
+        $result | Should -Match "Modified variables.*Unavailable"
+    }
+
+    It "degrades gracefully to 'Unavailable' when the diff itself fails (e.g. Ayfie.Saga.zip missing)" {
+        Mock Get-EnvConfigDiff { throw "zip not found" }
+
+        $result = Get-TemporaryEnvFileChangesReportSection "C:\Saga\"
+
+        $result | Should -Match "Removed variables.*Unavailable"
     }
 }

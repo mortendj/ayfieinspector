@@ -8,7 +8,7 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.18.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.19.0). The current release covers the rule engine,
 > custom refiners, Solr info (document count, index languages/memory/stack size/index size), the
 > scheduled restart task, an outbound firewall connectivity check, the Saga gateway certificate,
 > the authentication method, AD/Azure AD data source syncing, database info, backups, Docker
@@ -18,8 +18,10 @@ by hand.
 > features), the redacted `custom.env` file content, the data source connections (with settings
 > redacted), Supervisor info (report engine container status, license, Lingo configuration),
 > Personal Assistant info (operational mode and, on Saga versions before the models were dropped
-> from `custom.env`, the configured chat models), and Lingo info (enabled state, container status,
-> licenses, language/data type, and thread/recycle settings).
+> from `docker/.env`, the configured chat models), Lingo info (enabled state, container status,
+> licenses, language/data type, and thread/recycle settings), and a diff of the running
+> `docker/.env` against its as-shipped reference (removed/added/modified variables, excluding
+> anything accounted for by `custom.env`).
 
 > **Independent, unofficial project.** Not affiliated with, endorsed by, or sponsored by Ayfie
 > Group. "Ayfie", "Ayfie Index", and "Ayfie Locator" are trademarks of their respective owner.
@@ -92,6 +94,13 @@ by hand.
 - **Custom.env file content:** the `custom.env` overrides file, with values for any key matching a
   sensitive-naming convention (`PASSWORD`, `SECRET`, `API_KEY`, `API_TOKEN`) dropped entirely rather
   than shown or masked.
+- **Temporary .env file changes:** diffs the running installation's `docker/.env` against the
+  as-shipped reference extracted from `Ayfie.Saga.zip` (the install bundle Saga itself keeps at the
+  install root) - reporting variables removed, added, or modified relative to that reference.
+  Anything already accounted for by `custom.env` is excluded from the added/modified lists, since
+  that's a supported override rather than an unexpected hand-edit, and `COMPOSE_FILE` is always
+  excluded from the modified list since Saga's own tooling legitimately rewrites it depending which
+  optional add-ons (chat, report engine) are enabled.
 - **Data source connections:** every connector's connections (display name, enabled state,
   document count) and their settings, queried from the connector-broker API. Settings matching a
   sensitive-naming convention (`Token`, `Secret`, `Password`, `CompanyGuid`, `Key`) are dropped
@@ -225,6 +234,11 @@ Function: SharePoint Online
 AYFIE_SAGA_BRANDING_KEY=ayfie
 AYFIE_SAGA_HOST_NAME=engine.example.com
 
+################ TEMPORARY .ENV FILE CHANGES ################
+Removed variables: None
+Added variables: None
+Modified variables: AYFIE_SAGA_INDEX_LANGUAGES (en;nb;sv)
+
 #################### SCHEDULED RESTART #####################
 Task name: Restart-Saga
 Task execution time: Every Sunday at 03:00
@@ -355,6 +369,7 @@ src/
   AuthenticationInfo.ps1         identity provider / user federation provider counts from Keycloak
   SagaInfo.ps1                   Saga version, OS support check, installed connectors (API + plugins dir), connectors in use
   EnvFileInfo.ps1                custom.env file content, redacted
+  EnvConfigDiffInfo.ps1          docker/.env vs. as-shipped reference (Ayfie.Saga.zip) diff
   ConnectorApi.ps1               connector-broker API wrapper (installed connectors, connections, settings)
   DataSourceConnectionInfo.ps1   data source connections summary, settings redacted
   DatabaseInfo.ps1               database type/name/user/server/port, AD/Azure AD sync flag

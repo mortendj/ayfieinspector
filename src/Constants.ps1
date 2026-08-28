@@ -3,7 +3,7 @@
 # Named distinctly from Winspect's own $SCRIPT_VERSION/$SCRIPT_NAME (Constants.ps1) - Invoke-
 # AyfieInspector.ps1 dot-sources Winspect's Constants.ps1 too, and those names are already claimed
 # there.
-$AYFIE_INSPECTOR_VERSION           = "0.18.0"
+$AYFIE_INSPECTOR_VERSION           = "0.19.0"
 $AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-28"
 $AYFIE_INSPECTOR_NAME              = "AyfieInspector"
 $AYFIE_INSPECTOR_VERSION_STRING    = "$AYFIE_INSPECTOR_NAME v. $AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
@@ -156,6 +156,20 @@ $LINGO_RECYCLE_TIME_KEY = "AYFIE_LINGO_RECYCLE_AFTER_PROCESSING_TIME_IN_SECONDS"
 
 $LINGO_PII_LABEL = "pii"
 $LINGO_LANGUAGES = @('da', 'en', 'fr', 'de', 'it', 'nb', 'pl', 'pt', 'es', 'sv')
+
+################## TEMPORARY .ENV FILE CHANGES ##################
+
+# Ayfie.Saga.zip is the original install bundle Saga itself keeps at the install root after
+# install/update (index repo's docker-functions.ps1 falls back to a local ".\Ayfie.Saga*.zip" when
+# updating offline) - its Saga/docker/.env is the pristine, as-shipped reference configuration this
+# feature diffs the currently running .env against.
+$SAGA_ZIP_FILE_NAME               = "Ayfie.Saga.zip"
+$REFERENCE_DOT_ENV_RELATIVE_PATH  = "Saga\docker\.env"
+
+# Rewritten by Saga's own tooling depending which optional add-ons (chat, report engine) are
+# enabled, so it legitimately differs from the reference on every real installation - not a sign of
+# an unexpected hand-edit the way any other modified variable would be.
+$COMPOSE_FILE_KEY = "COMPOSE_FILE"
 
 ################## SCHEDULED RESTART ##################
 

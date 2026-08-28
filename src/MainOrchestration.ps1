@@ -515,6 +515,30 @@ function Get-CustomEnvFileReportSection($installDirPath) {
     return New-SectionOutput "CUSTOM.ENV FILE CONTENT" $lineScriptBlocks
 }
 
+function Get-TemporaryEnvFileChangesReportSection($installDirPath) {
+    $removedVariables = "Unavailable"
+    $addedVariables = "Unavailable"
+    $modifiedVariables = "Unavailable"
+    if ($installDirPath -ne "") {
+        try {
+            $envConfigDiff = Get-EnvConfigDiff $installDirPath
+            $removedVariables = $envConfigDiff.Removed
+            $addedVariables = $envConfigDiff.Added
+            $modifiedVariables = $envConfigDiff.Modified
+        } catch {
+            Write-Warning "Failed to determine temporary .env file changes: $_"
+        }
+    }
+    # Plain (unclosed) scriptblocks - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "Removed variables$FIELD_LABEL_SEPARATOR$removedVariables" },
+        { "Added variables$FIELD_LABEL_SEPARATOR$addedVariables" },
+        { "Modified variables$FIELD_LABEL_SEPARATOR$modifiedVariables" }
+    )
+    return New-SectionOutput "TEMPORARY .ENV FILE CHANGES" $lineScriptBlocks
+}
+
 function Get-DataSourceConnectionsReportSection($connectorApiRootUrl) {
     $dataSourceConnectionsSummary = "Unavailable"
     try {
@@ -675,6 +699,9 @@ function Start-AyfieInspector() {
 
     Write-Host "Reading custom.env file content..."
     $newSectionsRaw += Get-CustomEnvFileReportSection $resolvedInstallDirPath
+
+    Write-Host "Comparing the running docker/.env against the as-shipped reference..."
+    $newSectionsRaw += Get-TemporaryEnvFileChangesReportSection $resolvedInstallDirPath
 
     Write-Host "Checking the scheduled restart task ..."
     $newSectionsRaw += Get-ScheduledRestartReportSection

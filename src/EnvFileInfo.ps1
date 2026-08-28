@@ -13,10 +13,13 @@ function Get-EnvFileKeyValuePairs($envFilePath) {
     Write-ReturnValue $keyValuePairs
 }
 
-function Get-SecurityClearedEnvFileContent($envFilePath, $sensitiveTokens) {
+function Remove-SensitiveDotEnvKeys($keyValuePairs, $sensitiveTokens) {
     Write-FunctionCallLog $PSBoundParameters
-    $keyValuePairs = Get-EnvFileKeyValuePairs $envFilePath
-    $lines = @()
+    # Same "drop the whole key, don't mask the value" redaction principle used throughout this
+    # project (custom.env content, data source connection settings) - operates on the parsed
+    # dictionary rather than raw text so callers that need the filtered key/value data itself (the
+    # .env config diff), not just a rendered text block, can reuse it too.
+    $clearedKeyValuePairs = [ordered]@{}
     foreach ($key in $keyValuePairs.Keys) {
         $isSensitive = $false
         foreach ($token in $sensitiveTokens) {
@@ -26,9 +29,16 @@ function Get-SecurityClearedEnvFileContent($envFilePath, $sensitiveTokens) {
             }
         }
         if (-not $isSensitive) {
-            $lines += "$key=$($keyValuePairs[$key])"
+            $clearedKeyValuePairs[$key] = $keyValuePairs[$key]
         }
     }
+    Write-ReturnValue $clearedKeyValuePairs
+}
+
+function Get-SecurityClearedEnvFileContent($envFilePath, $sensitiveTokens) {
+    Write-FunctionCallLog $PSBoundParameters
+    $keyValuePairs = Remove-SensitiveDotEnvKeys (Get-EnvFileKeyValuePairs $envFilePath) $sensitiveTokens
+    $lines = @($keyValuePairs.Keys | ForEach-Object { "$_=$($keyValuePairs[$_])" })
     Write-ReturnValue ($lines -join $PHYSICAL_NEWLINE)
 }
 

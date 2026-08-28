@@ -137,6 +137,7 @@ $SCRIPT_PATH = $PSCommandPath
 . (Join-Path $SRC_DIR "AuthenticationInfo.ps1")
 . (Join-Path $SRC_DIR "SagaInfo.ps1")
 . (Join-Path $SRC_DIR "EnvFileInfo.ps1")
+. (Join-Path $SRC_DIR "EnvConfigDiffInfo.ps1")
 . (Join-Path $SRC_DIR "ConnectorApi.ps1")
 . (Join-Path $SRC_DIR "DataSourceConnectionInfo.ps1")
 . (Join-Path $SRC_DIR "DatabaseInfo.ps1")
