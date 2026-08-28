@@ -8,7 +8,7 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.20.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.21.0). The current release covers the rule engine,
 > custom refiners, Solr info (document count, index languages/memory/stack size/index size), the
 > scheduled restart task, an outbound firewall connectivity check, the Saga gateway certificate,
 > the authentication method, AD/Azure AD data source syncing, database info, backups, Docker
@@ -21,8 +21,9 @@ by hand.
 > from `docker/.env`, the configured chat models), Lingo info (enabled state, container status,
 > licenses, language/data type, and thread/recycle settings), and a diff of the running
 > `docker/.env` against its as-shipped reference (removed/added/modified variables, excluding
-> anything accounted for by `custom.env`), and the raw database connector configuration definitions
-> for every connector that has one.
+> anything accounted for by `custom.env`), the raw database connector configuration definitions
+> for every connector that has one, and detailed SSL certificate info (issuing authority, subject
+> alternative names, private key encryption status).
 
 > **Independent, unofficial project.** Not affiliated with, endorsed by, or sponsored by Ayfie
 > Group. "Ayfie", "Ayfie Index", and "Ayfie Locator" are trademarks of their respective owner.
@@ -125,6 +126,10 @@ by hand.
   succeeds if the other's endpoint/file isn't reachable (e.g. Saga is stopped). Can be pointed at
   an explicit file instead (skipping the live check entirely) for checking a host before Saga is
   even installed.
+- **SSL certificate info:** issuing certificate authority, subject alternative names, and the
+  private key's encryption status (`Encrypted`, `Unencrypted`, or - since it isn't easily
+  determined from the PEM header alone - a distinct "RSA key" case), read from the certificate file
+  itself (the private key only ever exists on disk, never over the live HTTPS check).
 - **Generic host facts:** everything Winspect itself reports — host identity, network adapters,
   CPU/RAM/disk capacity and usage, and certificate expirations — included in the same combined
   report, with an `AyfieInspector version` line added next to Winspect's own version line so a
@@ -189,6 +194,11 @@ by hand.
 ## Sample output
 
 ```
+################## SSL CERTIFICATE INFO #####################
+Certificate authority: CN=DigiCert Global CA, O=DigiCert Inc, C=US
+Subject alternative names: search.example.com
+Private key: Unencrypted
+
 ########### EXPIRATIONS AND CAPACITY DEPLETIONS ############
 Days left of Saga license: 94
 
@@ -378,7 +388,7 @@ src/
   RefinerInfo.ps1                custom refiners - fetch and summarize
   ScheduledTaskInfo.ps1          scheduled restart task - fetch and summarize
   FirewallInfo.ps1               outbound connectivity check
-  SagaCertificateInfo.ps1        Saga gateway certificate path - auto-discovery and override
+  SagaCertificateInfo.ps1        Saga gateway certificate path/detail - auto-discovery, override, CA/SAN/private key status
   AuthenticationInfo.ps1         identity provider / user federation provider counts from Keycloak
   SagaInfo.ps1                   Saga version, OS support check, installed connectors (API + plugins dir), connectors in use
   EnvFileInfo.ps1                custom.env file content, redacted

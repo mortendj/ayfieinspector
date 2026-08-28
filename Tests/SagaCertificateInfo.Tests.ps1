@@ -75,6 +75,60 @@ Describe "Get-DotEnvValue" {
     }
 }
 
+Describe "Get-CertificateAuthority" {
+    It "returns the certificate's Issuer property" {
+        $certificate = [pscustomobject]@{ Issuer = "CN=DigiCert Global CA" }
+
+        Get-CertificateAuthority $certificate | Should -Be "CN=DigiCert Global CA"
+    }
+}
+
+Describe "Get-CertificateSubjectAlternativeNames" {
+    It "joins every DNS name in the certificate's DnsNameList" {
+        $certificate = [pscustomobject]@{
+            DnsNameList = @([pscustomobject]@{ Unicode = "search.example.com" }, [pscustomobject]@{ Unicode = "search-alt.example.com" })
+        }
+
+        Get-CertificateSubjectAlternativeNames $certificate | Should -Be "search.example.com, search-alt.example.com"
+    }
+
+    It "returns an empty string, not an error, when there are no subject alternative names" {
+        $certificate = [pscustomobject]@{ DnsNameList = @() }
+
+        Get-CertificateSubjectAlternativeNames $certificate | Should -Be ""
+    }
+}
+
+Describe "Get-CertificateKeyEncryptionStatus" {
+    It "reports 'Encrypted' for a PEM key file with an encrypted private key header" {
+        $keyFilePath = Join-Path $TestDrive "encrypted.key"
+        Set-Content -Path $keyFilePath -Value "-----BEGIN ENCRYPTED PRIVATE KEY-----`nabc123`n-----END ENCRYPTED PRIVATE KEY-----"
+
+        Get-CertificateKeyEncryptionStatus $keyFilePath | Should -Be "Encrypted"
+    }
+
+    It "reports 'Unencrypted' for a PEM key file with a plain private key header" {
+        $keyFilePath = Join-Path $TestDrive "unencrypted.key"
+        Set-Content -Path $keyFilePath -Value "-----BEGIN PRIVATE KEY-----`nabc123`n-----END PRIVATE KEY-----"
+
+        Get-CertificateKeyEncryptionStatus $keyFilePath | Should -Be "Unencrypted"
+    }
+
+    It "reports the RSA case separately, since encryption status isn't easily determined for it" {
+        $keyFilePath = Join-Path $TestDrive "rsa.key"
+        Set-Content -Path $keyFilePath -Value "-----BEGIN RSA PRIVATE KEY-----`nabc123`n-----END RSA PRIVATE KEY-----"
+
+        Get-CertificateKeyEncryptionStatus $keyFilePath | Should -Be "RSA key (encryption status not easily determined)"
+    }
+
+    It "derives the .key file path from the certificate file path, not a path passed in directly" {
+        $certificateFilePath = Join-Path $TestDrive "gateway.crt"
+        Set-Content -Path (Join-Path $TestDrive "gateway.key") -Value "-----BEGIN PRIVATE KEY-----`nabc123`n-----END PRIVATE KEY-----"
+
+        Get-CertificateKeyEncryptionStatus $certificateFilePath | Should -Be "Unencrypted"
+    }
+}
+
 Describe "Get-SagaGatewayCertificateInfo" {
     It "returns the file override as-is and no hostname at all, without touching docker" {
         Mock Get-SagaInstallDirPath { throw "should not be called" }

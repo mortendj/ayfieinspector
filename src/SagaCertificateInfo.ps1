@@ -40,6 +40,34 @@ function Get-DotEnvValue($dotEnvFilePath, $key) {
     Write-ReturnValue $value
 }
 
+function Get-CertificateAuthority($certificate) {
+    Write-FunctionCallLog $PSBoundParameters
+    Write-ReturnValue $certificate.Issuer
+}
+
+function Get-CertificateSubjectAlternativeNames($certificate) {
+    Write-FunctionCallLog $PSBoundParameters
+    $subjectAlternativeNames = @($certificate.DnsNameList | ForEach-Object { $_.Unicode })
+    Write-ReturnValue ($subjectAlternativeNames -join ", ")
+}
+
+function Get-CertificateKeyEncryptionStatus($certificateFilePath) {
+    Write-FunctionCallLog $PSBoundParameters
+    # The private key lives in a separate file next to the certificate itself, same name with a
+    # .key extension - not part of the .crt at all, so this is a second, independent file read.
+    $certificateKeyFilePath = [System.IO.Path]::ChangeExtension($certificateFilePath, ".key")
+    $keyFileContent = Get-Content -Path $certificateKeyFilePath -Raw -ErrorAction Stop
+    if ($keyFileContent -match $ENCRYPTED_KEY_PATTERN) {
+        Write-ReturnValue "Encrypted"
+    } elseif ($keyFileContent -match $UNENCRYPTED_KEY_PATTERN) {
+        Write-ReturnValue "Unencrypted"
+    } elseif ($keyFileContent -match $RSA_KEY_PATTERN) {
+        Write-ReturnValue "RSA key (encryption status not easily determined)"
+    } else {
+        Write-ReturnValue "Unknown (not a recognized private key file format)"
+    }
+}
+
 function Get-SagaGatewayCertificateInfo($certificateFilePathOverride) {
     Write-FunctionCallLog $PSBoundParameters
     # Also returns InstallDirPath - not just certificate info - so that Get-SagaInstallDirPath's

@@ -7,6 +7,7 @@ BeforeAll {
     . "$PSScriptRoot/../../Winspect/src/ReportFormatting.ps1"
     . "$PSScriptRoot/../../Winspect/src/SystemQuery.ps1"
     . "$PSScriptRoot/../../Winspect/src/HostIdentity.ps1"
+    . "$PSScriptRoot/../../Winspect/src/Certificates.ps1"
     . "$PSScriptRoot/../src/Constants.ps1"
     . "$PSScriptRoot/../src/DashboardApi.ps1"
     . "$PSScriptRoot/../src/RuleEngineInfo.ps1"
@@ -42,6 +43,54 @@ BeforeAll {
             LastModifiedDate = "2026-01-01T00:00:00Z"; ConnectorTypeId = $null
             TargetRunner = $targetRunner; Definition = "<rules></rules>"
         }
+    }
+}
+
+Describe "Get-SslCertificateDetailReportSection" {
+    It "includes the certificate authority, subject alternative names, and private key status when everything succeeds" {
+        Mock Get-CertificateFromFile { [pscustomobject]@{ Issuer = "CN=DigiCert Global CA" } }
+        Mock Get-CertificateAuthority { "CN=DigiCert Global CA" }
+        Mock Get-CertificateSubjectAlternativeNames { "search.example.com, search-alt.example.com" }
+        Mock Get-CertificateKeyEncryptionStatus { "Encrypted" }
+
+        $result = Get-SslCertificateDetailReportSection "C:\Saga\volumes\Traefik\certs\gateway.crt"
+
+        $result | Should -Match "SSL CERTIFICATE INFO"
+        $result | Should -Match "Certificate authority.*CN=DigiCert Global CA"
+        $result | Should -Match "Subject alternative names.*search.example.com, search-alt.example.com"
+        $result | Should -Match "Private key.*Encrypted"
+    }
+
+    It "reports every field as 'Unavailable' when no certificate file path is known" {
+        Mock Get-CertificateFromFile { throw "should not be called" }
+
+        $result = Get-SslCertificateDetailReportSection ""
+
+        $result | Should -Match "Certificate authority.*Unavailable"
+        $result | Should -Match "Subject alternative names.*Unavailable"
+        $result | Should -Match "Private key.*Unavailable"
+    }
+
+    It "still reports the private key status when the certificate file itself can't be read" {
+        Mock Get-CertificateFromFile { throw "file not found" }
+        Mock Get-CertificateKeyEncryptionStatus { "Unencrypted" }
+
+        $result = Get-SslCertificateDetailReportSection "C:\Saga\volumes\Traefik\certs\gateway.crt"
+
+        $result | Should -Match "Certificate authority.*Unavailable"
+        $result | Should -Match "Private key.*Unencrypted"
+    }
+
+    It "degrades gracefully to 'Unavailable' when the private key file itself can't be read" {
+        Mock Get-CertificateFromFile { [pscustomobject]@{ Issuer = "CN=DigiCert Global CA" } }
+        Mock Get-CertificateAuthority { "CN=DigiCert Global CA" }
+        Mock Get-CertificateSubjectAlternativeNames { "search.example.com" }
+        Mock Get-CertificateKeyEncryptionStatus { throw "key file not found" }
+
+        $result = Get-SslCertificateDetailReportSection "C:\Saga\volumes\Traefik\certs\gateway.crt"
+
+        $result | Should -Match "Certificate authority.*CN=DigiCert Global CA"
+        $result | Should -Match "Private key.*Unavailable"
     }
 }
 

@@ -239,6 +239,51 @@ function Get-SagaLicenseInfoReportSection($licenseSummary) {
     return New-SectionOutput "SAGA LICENSE INFO" $lineScriptBlocks
 }
 
+function Get-SslCertificateDetailReportSection($certificateFilePath) {
+    # Certificate authority/subject-alternative-names/private-key-encryption-status detail -
+    # deliberately its own section rather than folded into the SAGA CERTIFICATE section above it,
+    # since that one is Winspect's own generic certificate-store-vs-live-vs-file comparison and
+    # doesn't expose the underlying certificate object back to AyfieInspector for further field
+    # extraction. Reads from the certificate FILE specifically (not the live HTTPS endpoint) since
+    # the private key only ever exists on disk next to it.
+    $certificateAuthority = "Unavailable"
+    $subjectAlternativeNames = "Unavailable"
+    $privateKeyStatus = "Unavailable"
+    if ($certificateFilePath -ne "") {
+        $certificate = $null
+        try {
+            $certificate = Get-CertificateFromFile $certificateFilePath
+        } catch {
+            Write-Warning "Failed to read the SSL certificate file '$certificateFilePath': $_"
+        }
+        if ($null -ne $certificate) {
+            try {
+                $certificateAuthority = Get-CertificateAuthority $certificate
+            } catch {
+                Write-Warning "Failed to determine the certificate authority: $_"
+            }
+            try {
+                $subjectAlternativeNames = Get-CertificateSubjectAlternativeNames $certificate
+            } catch {
+                Write-Warning "Failed to determine the certificate's subject alternative names: $_"
+            }
+        }
+        try {
+            $privateKeyStatus = Get-CertificateKeyEncryptionStatus $certificateFilePath
+        } catch {
+            Write-Warning "Failed to determine the private key encryption status: $_"
+        }
+    }
+    # Plain (unclosed) scriptblocks - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "Certificate authority$FIELD_LABEL_SEPARATOR$certificateAuthority" },
+        { "Subject alternative names$FIELD_LABEL_SEPARATOR$subjectAlternativeNames" },
+        { "Private key$FIELD_LABEL_SEPARATOR$privateKeyStatus" }
+    )
+    return New-SectionOutput "SSL CERTIFICATE INFO" $lineScriptBlocks
+}
+
 function Get-ExpirationsAndCapacityDepletionsReportSection($licenseSummary) {
     # Deliberately just the Saga license half of what the older tool this is ported from covers
     # under this same heading - the SSL certificate half is left out here, since AyfieInspector's
@@ -692,7 +737,9 @@ function Start-AyfieInspector() {
     # Section order is deliberately importance-first: short, urgent/actionable facts before large,
     # rarely-searched-for dumps - firewall/schedule/count first, then refiners, then the
     # potentially large rule definitions last.
-    $newSectionsRaw = Get-ExpirationsAndCapacityDepletionsReportSection $resolvedLicenseSummary
+    $newSectionsRaw = Get-SslCertificateDetailReportSection $resolvedCertificateFilePath
+
+    $newSectionsRaw += Get-ExpirationsAndCapacityDepletionsReportSection $resolvedLicenseSummary
 
     if ($skipFirewallCheck) {
         Write-Host "Skipping firewall openings check (-skipFirewallCheck)..."

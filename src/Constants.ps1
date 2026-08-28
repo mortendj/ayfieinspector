@@ -3,7 +3,7 @@
 # Named distinctly from Winspect's own $SCRIPT_VERSION/$SCRIPT_NAME (Constants.ps1) - Invoke-
 # AyfieInspector.ps1 dot-sources Winspect's Constants.ps1 too, and those names are already claimed
 # there.
-$AYFIE_INSPECTOR_VERSION           = "0.20.0"
+$AYFIE_INSPECTOR_VERSION           = "0.21.0"
 $AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-28"
 $AYFIE_INSPECTOR_NAME              = "AyfieInspector"
 $AYFIE_INSPECTOR_VERSION_STRING    = "$AYFIE_INSPECTOR_NAME v. $AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
@@ -38,6 +38,13 @@ $GATEWAY_CERTIFICATE_NAME_KEY = "AYFIE_SAGA_GATEWAY_CERTIFICATE_NAME"
 $GATEWAY_HOSTNAME_KEY         = "AYFIE_SAGA_HOST_NAME"
 $BRANDING_KEY                 = "AYFIE_SAGA_BRANDING_KEY"
 $GIT_VERSION_RELATIVE_PATH    = "git.version"
+
+# Private key files sit alongside the certificate file itself (same name, .key extension) and are
+# plain PEM text - their header line alone is enough to tell an encrypted key from an unencrypted
+# one, without needing to actually parse the key material.
+$ENCRYPTED_KEY_PATTERN        = "BEGIN ENCRYPTED PRIVATE KEY"
+$UNENCRYPTED_KEY_PATTERN      = "BEGIN PRIVATE KEY"
+$RSA_KEY_PATTERN              = "BEGIN RSA PRIVATE KEY"
 
 ################## AUTHENTICATION METHOD ##################
 

@@ -127,6 +127,7 @@ $SCRIPT_PATH = $PSCommandPath
 . (Join-Path $WINSPECT_SRC_DIR "ReportFormatting.ps1")
 . (Join-Path $WINSPECT_SRC_DIR "SystemQuery.ps1")
 . (Join-Path $WINSPECT_SRC_DIR "HostIdentity.ps1")
+. (Join-Path $WINSPECT_SRC_DIR "Certificates.ps1")
 . (Join-Path $SRC_DIR "Constants.ps1")
 . (Join-Path $SRC_DIR "DashboardApi.ps1")
 . (Join-Path $SRC_DIR "RuleEngineInfo.ps1")
