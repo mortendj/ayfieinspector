@@ -23,6 +23,7 @@ BeforeAll {
     . "$PSScriptRoot/../src/DirectorySizeInfo.ps1"
     . "$PSScriptRoot/../src/DockerInfo.ps1"
     . "$PSScriptRoot/../src/BackupInfo.ps1"
+    . "$PSScriptRoot/../src/LicenseInfo.ps1"
     . "$PSScriptRoot/../src/MainOrchestration.ps1"
 
     # New-SectionOutput/Get-SectionHeader/Complete-Report (dot-sourced above) need these set the
@@ -472,6 +473,97 @@ Describe "Get-BackupsReportSection" {
         $result = Get-BackupsReportSection ""
 
         $result | Should -Match "Number of backups.*Unavailable"
+    }
+}
+
+Describe "Get-SagaLicenseInfoReportSection" {
+    # Takes the already-resolved summary as a parameter now, rather than resolving it internally -
+    # see the note on the function itself for why (Add-CustomerNameToReportInfo and
+    # Get-ExpirationsAndCapacityDepletionsReportSection need the same data).
+
+    It "includes all six fields when the license summary succeeds" {
+        $licenseSummary = [pscustomobject]@{
+            CustomerId = "1234567"; ActivationDates = "2022-06-01T15:12:58Z"
+            ExpirationDates = "2027-01-31T13:08:22Z"; UserCapacity = 100; DocumentCapacity = 1000000
+            Features = "Connector: File Server Connector"
+        }
+
+        $result = Get-SagaLicenseInfoReportSection $licenseSummary
+
+        $result | Should -Match "SAGA LICENSE INFO"
+        $result | Should -Match "Customer Id.*1234567"
+        $result | Should -Match "Activation date \(utc\).*2022-06-01T15:12:58Z"
+        $result | Should -Match "Expiration date \(utc\).*2027-01-31T13:08:22Z"
+        $result | Should -Match "User capacity.*100"
+        $result | Should -Match "Document capacity.*1000000"
+        $result | Should -Match "Connector: File Server Connector"
+    }
+
+    It "reports every field as 'Unavailable' when the summary is null (resolution failed entirely)" {
+        $result = Get-SagaLicenseInfoReportSection $null
+
+        $result | Should -Match "Customer Id.*Unavailable"
+        $result | Should -Match "User capacity.*Unavailable"
+    }
+
+    It "still shows customerId as 'Unavailable'-free when only some fields resolve" {
+        $licenseSummary = [pscustomobject]@{
+            CustomerId = "1234567"; ActivationDates = $null; ExpirationDates = $null
+            UserCapacity = $null; DocumentCapacity = $null; Features = $null
+        }
+
+        $result = Get-SagaLicenseInfoReportSection $licenseSummary
+
+        $result | Should -Match "Customer Id.*1234567"
+        $result | Should -Match "User capacity.*Unavailable"
+    }
+}
+
+Describe "Get-ExpirationsAndCapacityDepletionsReportSection" {
+    It "includes the days-left figure under the section heading" {
+        Mock Get-DaysUntilSagaLicenseExpires { 94 }
+
+        $result = Get-ExpirationsAndCapacityDepletionsReportSection ([pscustomobject]@{})
+
+        $result | Should -Match "EXPIRATIONS AND CAPACITY DEPLETIONS"
+        $result | Should -Match "Days left of Saga license.*94"
+    }
+
+    It "degrades gracefully (no crash, 'Unavailable') when the check itself fails" {
+        Mock Get-DaysUntilSagaLicenseExpires { throw "should not normally throw, but handled anyway" }
+
+        $result = Get-ExpirationsAndCapacityDepletionsReportSection ([pscustomobject]@{})
+
+        $result | Should -Match "Days left of Saga license.*Unavailable"
+    }
+}
+
+Describe "Add-CustomerNameToReportInfo" {
+    It "inserts a Customer line directly after the REPORT INFO section header" {
+        $winspectReportText = @(
+            "####################### REPORT INFO ########################",
+            "Local time: 2026-08-28 17:16:02",
+            "User: kth-search-prod\prod-ayfie-admin"
+        ) -join $PHYSICAL_NEWLINE
+
+        $result = Add-CustomerNameToReportInfo $winspectReportText "Acme Corp"
+        $resultLines = @($result -split $PHYSICAL_NEWLINE)
+
+        $resultLines[0] | Should -Match "REPORT INFO"
+        $resultLines[1] | Should -Match "^Customer.*Acme Corp"
+        $resultLines[2] | Should -Be "Local time: 2026-08-28 17:16:02"
+    }
+
+    It "returns the original text unchanged (no 'Customer' line at all) when there's no customer name" {
+        $winspectReportText = @("####################### REPORT INFO ########################", "Local time: x") -join $PHYSICAL_NEWLINE
+
+        Add-CustomerNameToReportInfo $winspectReportText $null | Should -Be $winspectReportText
+    }
+
+    It "returns the original text unchanged if the REPORT INFO section header can't be found" {
+        $winspectReportText = @("Some unrelated report text", "with no REPORT INFO header at all") -join $PHYSICAL_NEWLINE
+
+        Add-CustomerNameToReportInfo $winspectReportText "Acme Corp" | Should -Be $winspectReportText
     }
 }
 

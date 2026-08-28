@@ -3,7 +3,7 @@
 # Named distinctly from Winspect's own $SCRIPT_VERSION/$SCRIPT_NAME (Constants.ps1) - Invoke-
 # AyfieInspector.ps1 dot-sources Winspect's Constants.ps1 too, and those names are already claimed
 # there.
-$AYFIE_INSPECTOR_VERSION           = "0.16.0"
+$AYFIE_INSPECTOR_VERSION           = "0.17.0"
 $AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-28"
 $AYFIE_INSPECTOR_NAME              = "AyfieInspector"
 $AYFIE_INSPECTOR_VERSION_STRING    = "$AYFIE_INSPECTOR_NAME v. $AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
@@ -113,6 +113,11 @@ $CONNECTOR_CONTAINER_NAME_PATTERN = "ayfie-connector-(\w+)"
 
 $CONNECTOR_PLUGINS_RELATIVE_PATH = "plugins"
 $CONNECTOR_PLUGIN_PREFIX         = "connector-"
+
+################## SAGA LICENSE INFO ##################
+
+$LICENSING_API_PATH      = "api/licensing/v1/ProductLicense"
+$PERPETUAL_LICENSE_LABEL = "Perpetual"
 
 ################## SCHEDULED RESTART ##################
 

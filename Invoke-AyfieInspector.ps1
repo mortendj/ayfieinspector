@@ -143,6 +143,7 @@ $SCRIPT_PATH = $PSCommandPath
 . (Join-Path $SRC_DIR "DirectorySizeInfo.ps1")
 . (Join-Path $SRC_DIR "DockerInfo.ps1")
 . (Join-Path $SRC_DIR "BackupInfo.ps1")
+. (Join-Path $SRC_DIR "LicenseInfo.ps1")
 . (Join-Path $SRC_DIR "MainOrchestration.ps1")
 
 Start-AyfieInspector

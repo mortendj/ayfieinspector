@@ -205,6 +205,103 @@ function Get-SagaInfoReportSection($installDirPath, $gatewayHostname, $connector
     return New-SectionOutput "SAGA INFO" $lineScriptBlocks
 }
 
+function Get-SagaLicenseInfoReportSection($licenseSummary) {
+    # Takes the already-resolved summary rather than resolving it itself - Get-LicensingContainerIp
+    # (a docker call) + Get-SagaLicenseSummary (a network call) are both resolved once, early in
+    # Start-AyfieInspector, since Add-CustomerNameToReportInfo and
+    # Get-ExpirationsAndCapacityDepletionsReportSection both need the same data too; resolving here
+    # as well would mean fetching it twice per run for no benefit.
+    $customerId = "Unavailable"
+    $activationDates = "Unavailable"
+    $expirationDates = "Unavailable"
+    $userCapacity = "Unavailable"
+    $documentCapacity = "Unavailable"
+    $features = "Unavailable"
+    if ($null -ne $licenseSummary) {
+        if ($null -ne $licenseSummary.CustomerId) { $customerId = $licenseSummary.CustomerId }
+        if ($null -ne $licenseSummary.ActivationDates) { $activationDates = $licenseSummary.ActivationDates }
+        if ($null -ne $licenseSummary.ExpirationDates) { $expirationDates = $licenseSummary.ExpirationDates }
+        if ($null -ne $licenseSummary.UserCapacity) { $userCapacity = $licenseSummary.UserCapacity }
+        if ($null -ne $licenseSummary.DocumentCapacity) { $documentCapacity = $licenseSummary.DocumentCapacity }
+        if ($null -ne $licenseSummary.Features) { $features = $licenseSummary.Features }
+    }
+    # Plain (unclosed) scriptblocks - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "Customer Id$FIELD_LABEL_SEPARATOR$customerId" },
+        { "Activation date (utc)$FIELD_LABEL_SEPARATOR$activationDates" },
+        { "Expiration date (utc)$FIELD_LABEL_SEPARATOR$expirationDates" },
+        { "User capacity$FIELD_LABEL_SEPARATOR$userCapacity" },
+        { "Document capacity$FIELD_LABEL_SEPARATOR$documentCapacity" },
+        { "Licensed features$FIELD_LABEL_SEPARATOR" },
+        { "$features" }
+    )
+    return New-SectionOutput "SAGA LICENSE INFO" $lineScriptBlocks
+}
+
+function Get-ExpirationsAndCapacityDepletionsReportSection($licenseSummary) {
+    # Deliberately just the Saga license half of what the older tool this is ported from covers
+    # under this same heading - the SSL certificate half is left out here, since AyfieInspector's
+    # SAGA CERTIFICATE section already shows its own days-remaining figure
+    # ("expires 2026-11-15 (78 days)"), and computing it again here would mean either re-resolving
+    # the certificate a second time or fragile-parsing it back out of already-rendered text.
+    $daysUntilSagaLicenseExpires = "Unavailable"
+    try {
+        $daysUntilSagaLicenseExpires = Get-DaysUntilSagaLicenseExpires $licenseSummary
+    } catch {
+        Write-Warning "Failed to determine days until Saga license expiration: $_"
+    }
+    # Plain (unclosed) scriptblock - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "Days left of Saga license$FIELD_LABEL_SEPARATOR$daysUntilSagaLicenseExpires" }
+    )
+    return New-SectionOutput "EXPIRATIONS AND CAPACITY DEPLETIONS" $lineScriptBlocks
+}
+
+function Add-CustomerNameToReportInfo($winspectReportText, $customerName) {
+    Write-FunctionCallLog $PSBoundParameters
+    # Spliced in as plain text surgery on Winspect's already-rendered output, exactly like
+    # Add-AyfieInspectorVersionToReportInfo above - Winspect has no concept of "customer", so this
+    # stays entirely on the AyfieInspector side rather than teaching Winspect anything product-
+    # specific. Unlike the version-line splice (which inserts after a specific existing line),
+    # Customer is inserted as the very first line of the section, directly after its header -
+    # matching the older tool's own REPORT INFO layout, and simply omitted (not "Unavailable")
+    # when no customer name could be resolved, since a report predating any known customer
+    # (checking a host before Saga is installed) is a normal, not a failure, state.
+    if (-not $customerName) {
+        Write-ReturnValue $winspectReportText
+        return
+    }
+    $customerLineRaw = "Customer$FIELD_LABEL_SEPARATOR$customerName"
+    $customerLineFormatted = (Complete-Report $customerLineRaw) -join $PHYSICAL_NEWLINE
+
+    # Matched by exact equality against the real rendered header line (not a substring search) -
+    # "REPORT INFO" alone is common enough that it could appear elsewhere (confirmed by a real test
+    # failure: a line of ordinary prose containing that same phrase was matched instead of the
+    # actual header, silently splicing the Customer line into the wrong place). Get-SectionHeader
+    # reconstructs exactly what Winspect itself would have rendered, in whichever output style is
+    # currently active.
+    $reportInfoHeaderLine = Get-SectionHeader "REPORT INFO"
+    $lines = @($winspectReportText -split $PHYSICAL_NEWLINE)
+    $reportInfoHeaderIndex = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -eq $reportInfoHeaderLine) {
+            $reportInfoHeaderIndex = $i
+            break
+        }
+    }
+    if ($reportInfoHeaderIndex -eq -1) {
+        Write-WarningLog "Could not find the REPORT INFO section header to splice the Customer line after"
+        Write-ReturnValue $winspectReportText
+    } else {
+        $linesBefore = $lines[0..$reportInfoHeaderIndex]
+        $linesAfter = if ($reportInfoHeaderIndex -lt $lines.Count - 1) { $lines[($reportInfoHeaderIndex + 1)..($lines.Count - 1)] } else { @() }
+        $newLines = $linesBefore + $customerLineFormatted + $linesAfter
+        Write-ReturnValue ($newLines -join $PHYSICAL_NEWLINE)
+    }
+}
+
 function Get-DataSourceUserSyncingReportSection($installDirPath) {
     $adAndAzureAdSync = "Unavailable"
     if ($installDirPath -ne "") {
@@ -393,10 +490,27 @@ function Start-AyfieInspector() {
         Write-Warning "Could not resolve the Saga gateway certificate info: $_"
     }
 
+    Write-Host "Resolving the Saga license info..."
+    # Resolved once, here, rather than inside Get-SagaLicenseInfoReportSection itself -
+    # Add-CustomerNameToReportInfo (right below) and Get-ExpirationsAndCapacityDepletionsReportSection
+    # (built later, among the other new sections) both need this same data, and it costs a real
+    # docker call plus a network call to fetch, so it's fetched once and passed to all three call
+    # sites rather than three times. Left as $null (not a placeholder object) on failure, so
+    # downstream consumers can tell "resolution failed entirely" apart from "resolved fine, but
+    # there's genuinely nothing to report" (e.g. no valid license at all).
+    $resolvedLicenseSummary = $null
+    try {
+        $licensingContainerIp = Get-LicensingContainerIp
+        $resolvedLicenseSummary = Get-SagaLicenseSummary $licensingContainerIp
+    } catch {
+        Write-Warning "Could not resolve the Saga license info: $_"
+    }
+
     Write-Host "Running Winspect ($winspectPath) for generic host facts..."
     $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel -certificateFilePath $resolvedCertificateFilePath -certificateHostname $resolvedCertificateHostname -certificateSectionLabel "SAGA CERTIFICATE" -gmsaAccountName $gmsaAccountName
     $winspectReportText = $winspectReportLines -join $PHYSICAL_NEWLINE
     $winspectReportText = Add-AyfieInspectorVersionToReportInfo $winspectReportText
+    $winspectReportText = Add-CustomerNameToReportInfo $winspectReportText $resolvedLicenseSummary.CustomerName
 
     if ($logLevel -ne "off") {
         # Winspect's own Get-LogFilePath names its log after Winspect's own script path - now that
@@ -419,12 +533,14 @@ function Start-AyfieInspector() {
     # Section order is deliberately importance-first: short, urgent/actionable facts before large,
     # rarely-searched-for dumps - firewall/schedule/count first, then refiners, then the
     # potentially large rule definitions last.
+    $newSectionsRaw = Get-ExpirationsAndCapacityDepletionsReportSection $resolvedLicenseSummary
+
     if ($skipFirewallCheck) {
         Write-Host "Skipping firewall openings check (-skipFirewallCheck)..."
     } else {
         Write-Host "Checking firewall openings (this can take a while)..."
     }
-    $newSectionsRaw = Get-FirewallOpeningsReportSection
+    $newSectionsRaw += Get-FirewallOpeningsReportSection
 
     Write-Host "Determining the authentication method..."
     $newSectionsRaw += Get-AuthenticationMethodReportSection
@@ -436,6 +552,8 @@ function Start-AyfieInspector() {
 
     Write-Host "Checking backups..."
     $newSectionsRaw += Get-BackupsReportSection $resolvedInstallDirPath
+
+    $newSectionsRaw += Get-SagaLicenseInfoReportSection $resolvedLicenseSummary
 
     Write-Host "Reading custom.env file content..."
     $newSectionsRaw += Get-CustomEnvFileReportSection $resolvedInstallDirPath

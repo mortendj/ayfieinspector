@@ -8,13 +8,15 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.16.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.17.0). The current release covers the rule engine,
 > custom refiners, Solr info (document count, index languages/memory/stack size/index size), the
 > scheduled restart task, an outbound firewall connectivity check, the Saga gateway certificate,
 > the authentication method, AD/Azure AD data source syncing, database info, backups, Docker
 > images currently in use, an optional gMSA account check, installation info (install directory,
-> Saga version, branding, gateway hostname, OS support status, installed/in-use connectors), the
-> redacted `custom.env` file content, and the data source connections (with settings redacted).
+> Saga version, branding, gateway hostname, OS support status, installed/in-use connectors), Saga
+> license info (customer ID, activation/expiration dates, user/document capacity, licensed
+> features), the redacted `custom.env` file content, and the data source connections (with
+> settings redacted).
 
 > **Independent, unofficial project.** Not affiliated with, endorsed by, or sponsored by Ayfie
 > Group. "Ayfie", "Ayfie Index", and "Ayfie Locator" are trademarks of their respective owner.
@@ -59,6 +61,19 @@ by hand.
 - **gMSA account check** (opt-in, needs `-gmsaAccountName`): passed straight through to Winspect's
   own gMSA validation, adding a `GMSA ACCOUNT` section reporting the account name and whether it
   validates successfully.
+- **Saga license info:** customer ID, activation/expiration dates, user/document capacity, and
+  licensed features - queried directly from the licensing container's own API. Only currently-valid
+  licenses count towards capacity and features (an installation can hold more than one - e.g. a
+  base license plus an add-on - so capacities are summed and features are concatenated across all
+  of them, not deduplicated). The customer ID is still shown even when every license has expired,
+  since it's identifying information rather than a capacity/feature claim that would be misleading
+  to report for an expired license. The customer's name is also spliced into the `REPORT INFO`
+  section (as `Customer`, right after the section header) whenever it's known - simply omitted, not
+  shown as "Unavailable", when it isn't (e.g. checking a host before Saga is installed).
+- **Expirations and capacity depletions:** days left until the Saga license expires (`Perpetual` for
+  a perpetual license, `No valid license` when there's genuinely none). Deliberately doesn't
+  duplicate the SSL certificate's own days-remaining figure, which is already shown in the `SAGA
+  CERTIFICATE` section.
 - **Custom.env file content:** the `custom.env` overrides file, with values for any key matching a
   sensitive-naming convention (`PASSWORD`, `SECRET`, `API_KEY`, `API_TOKEN`) dropped entirely rather
   than shown or masked.
@@ -97,10 +112,11 @@ by hand.
 - Run elevated (as Administrator) to get real disk speed/latency numbers in the Winspect portion
   of the report.
 - Docker CLI access, to auto-discover the gateway certificate's file location and the configured
-  gateway hostname from the running installation's `.env`, and to list running containers/images
-  (Saga info's connector container check, Docker images currently in use). Not needed for the
-  certificate/install-dir discovery if `-certificateFilePath` is given explicitly instead (e.g.
-  checking a host before Saga is installed, when there's no running installation to discover from).
+  gateway hostname from the running installation's `.env`, to list running containers/images (Saga
+  info's connector container check, Docker images currently in use), and to resolve the licensing
+  container's IP for the Saga license info check. Not needed for the certificate/install-dir
+  discovery if `-certificateFilePath` is given explicitly instead (e.g. checking a host before Saga
+  is installed, when there's no running installation to discover from).
 - Outbound network access to the gateway hostname on port 443, for the live HTTPS certificate
   check. Not required - the check falls back to the certificate file if the endpoint can't be
   reached, and says so in the report.
@@ -142,6 +158,9 @@ by hand.
 ## Sample output
 
 ```
+########### EXPIRATIONS AND CAPACITY DEPLETIONS ############
+Days left of Saga license: 94
+
 #################### FIREWALL OPENINGS #####################
 Reachable sites:
     github.com
@@ -176,6 +195,16 @@ Running connector containers:
 Number of backups: 2
 Latest backup: 2026-03-21 17:59
 Total size: 151.751 MB
+
+#################### SAGA LICENSE INFO #####################
+Customer Id: 1234567
+Activation date (utc): 2022-06-01T15:12:58Z
+Expiration date (utc): 2027-01-31T13:08:22Z
+User capacity: 100
+Document capacity: 1000000
+Licensed features: 
+Connector: File Server Connector
+Function: SharePoint Online
 
 ################# CUSTOM.ENV FILE CONTENT ##################
 AYFIE_SAGA_BRANDING_KEY=ayfie
@@ -255,7 +284,8 @@ Rules:
 ```
 
 (The Winspect-generated sections — REPORT INFO (with an added `AyfieInspector version` line right
-alongside Winspect's own), CERTIFICATES, SAGA CERTIFICATE (Winspect's generic "additional
+alongside Winspect's own, and a `Customer` line right after the section header when the customer
+name is known), CERTIFICATES, SAGA CERTIFICATE (Winspect's generic "additional
 certificate" check, given AyfieInspector's own section title — hostname and file both resolved by
 AyfieInspector and passed through to Winspect, which checks the hostname live over HTTPS first and
 only falls back to the file if that's unreachable, always stating which one actually produced the
@@ -297,6 +327,7 @@ src/
   DirectorySizeInfo.ps1          recursive directory size scan, invariant-culture formatted
   DockerInfo.ps1                 running containers/images, running connector containers
   BackupInfo.ps1                 backup count, latest backup, total size
+  LicenseInfo.ps1                Saga license info (customer ID, dates, capacity, features)
   MainOrchestration.ps1          builds each report section and assembles the combined report
 ```
 
