@@ -3,8 +3,8 @@
 # Named distinctly from Winspect's own $SCRIPT_VERSION/$SCRIPT_NAME (Constants.ps1) - Invoke-
 # AyfieInspector.ps1 dot-sources Winspect's Constants.ps1 too, and those names are already claimed
 # there.
-$AYFIE_INSPECTOR_VERSION           = "0.14.0"
-$AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-27"
+$AYFIE_INSPECTOR_VERSION           = "0.15.0"
+$AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-28"
 $AYFIE_INSPECTOR_NAME              = "AyfieInspector"
 $AYFIE_INSPECTOR_VERSION_STRING    = "$AYFIE_INSPECTOR_NAME v. $AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
 
@@ -71,6 +71,16 @@ $SUPPORTED_OS        = @(
 
 $CUSTOM_ENV_RELATIVE_PATH = "docker/custom.env"
 $SENSITIVE_ENV_TOKENS     = @("PASSWORD", "SECRET", "API_KEY", "API_TOKEN")
+
+################## DATA SOURCE CONNECTIONS ##################
+
+# Same redaction convention as the CUSTOM.ENV FILE CONTENT feature (drop the whole key rather than
+# mask the value) but a different token list - connector setting names follow their own naming
+# convention (e.g. AuthKey, ClientSecret), not the .env UPPER_SNAKE_CASE one. "Key" included from
+# day one here (unlike the older tool this is ported from, which needed a live production find to
+# discover its own settings redaction missed a connector's AuthKey field - see
+# project_ayfieinspector_gateway_cert_feature.md for that writeup).
+$SENSITIVE_CONN_TOKENS = @("Token", "Secret", "Password", "CompanyGuid", "Key")
 
 ################## SCHEDULED RESTART ##################
 

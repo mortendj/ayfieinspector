@@ -8,11 +8,11 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.14.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.15.0). The current release covers the rule engine,
 > custom refiners, the Solr document count, the scheduled restart task, an outbound firewall
 > connectivity check, the Saga gateway certificate, the authentication method, basic installation
-> info (install directory, Saga version, branding, gateway hostname, OS support status), and the
-> redacted `custom.env` file content.
+> info (install directory, Saga version, branding, gateway hostname, OS support status), the
+> redacted `custom.env` file content, and the data source connections (with settings redacted).
 
 > **Independent, unofficial project.** Not affiliated with, endorsed by, or sponsored by Ayfie
 > Group. "Ayfie", "Ayfie Index", and "Ayfie Locator" are trademarks of their respective owner.
@@ -44,6 +44,11 @@ by hand.
 - **Custom.env file content:** the `custom.env` overrides file, with values for any key matching a
   sensitive-naming convention (`PASSWORD`, `SECRET`, `API_KEY`, `API_TOKEN`) dropped entirely rather
   than shown or masked.
+- **Data source connections:** every connector's connections (display name, enabled state,
+  document count) and their settings, queried from the connector-broker API. Settings matching a
+  sensitive-naming convention (`Token`, `Secret`, `Password`, `CompanyGuid`, `Key`) are dropped
+  entirely rather than shown or masked - same redaction principle as the custom.env feature above,
+  with its own token list since connector setting names follow a different naming convention.
 - **Saga gateway certificate:** identifies and reports the expiration of the actual Ayfie/Saga
   gateway certificate — a file-backed certificate the generic Windows certificate store scan below
   can never see. Checked both live over HTTPS against the configured gateway hostname (proof of
@@ -105,6 +110,7 @@ by hand.
 | `-outputFormat` | `text`, `markdown`, `html` | `text` | Report style. |
 | `-outputDestination` | `terminal`, `file`, `both` | `both` | Where the report goes. |
 | `-dashboardApiRootUrl` | URL | `http://localhost/Dashboard/api` | Root URL for the rule engine, refiner, and Solr count checks. |
+| `-connectorApiRootUrl` | URL | `http://localhost/api/connector-broker/v1` | Root URL for the data source connections check. |
 | `-logLevel` | `trace`, `debug`, `info`, `warning`, `error`, `off` | `off` | Logging verbosity. |
 | `-skipFirewallCheck` | switch | off | Skip the outbound connectivity check (adds noticeable time otherwise). |
 | `-certificateFilePath` | path | auto-discovered | Path to the Saga gateway certificate file; only needed to override auto-discovery, e.g. when checking a host before Saga is installed. Setting this skips the live HTTPS check entirely (no gateway hostname is resolved). |
@@ -156,6 +162,14 @@ Refiners:
         SelectionLimit: 1000
         Enabled: True
         SortOrder: 5
+
+################# DATA SOURCE CONNECTIONS ##################
+NetData (fileserver)
+    Enabled: True
+    Document count: 44907
+    Settings:
+        StartPath=\\host\NetData
+        FilenameFilterMode=2
 
 #################### CUSTOM INDEX RULES ####################
 Rules:

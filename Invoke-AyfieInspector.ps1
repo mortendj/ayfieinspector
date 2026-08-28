@@ -40,6 +40,11 @@ Root URL of the Dashboard API that the rule engine, custom refiners, and source 
 all queried through. Defaults to "http://localhost/Dashboard/api" - this must run on the
 Saga/Ayfie Index host itself, since that endpoint isn't designed for remote access.
 
+.PARAMETER connectorApiRootUrl
+Root URL of the connector-broker API that the data source connections section is queried through.
+Defaults to "http://localhost/api/connector-broker/v1" - like dashboardApiRootUrl, this must run on
+the Saga/Ayfie Index host itself.
+
 .PARAMETER logLevel
 Sets the log level to trace, debug, info, warning or error. Off (no logging) is the default. Passed
 through to Winspect as well, so one flag controls both halves. Writes two separate log files (one
@@ -85,6 +90,8 @@ param(
 
     [string]$dashboardApiRootUrl = "http://localhost/Dashboard/api",
 
+    [string]$connectorApiRootUrl = "http://localhost/api/connector-broker/v1",
+
     [Parameter(Mandatory=$false)]
     [ValidateSet("trace", "debug", "info", "warning", "error", "off")]
     [string]$logLevel = "off",
@@ -123,6 +130,8 @@ $SCRIPT_PATH = $PSCommandPath
 . (Join-Path $SRC_DIR "AuthenticationInfo.ps1")
 . (Join-Path $SRC_DIR "SagaInfo.ps1")
 . (Join-Path $SRC_DIR "EnvFileInfo.ps1")
+. (Join-Path $SRC_DIR "ConnectorApi.ps1")
+. (Join-Path $SRC_DIR "DataSourceConnectionInfo.ps1")
 . (Join-Path $SRC_DIR "MainOrchestration.ps1")
 
 Start-AyfieInspector

@@ -17,6 +17,8 @@ BeforeAll {
     . "$PSScriptRoot/../src/SagaCertificateInfo.ps1"
     . "$PSScriptRoot/../src/SagaInfo.ps1"
     . "$PSScriptRoot/../src/EnvFileInfo.ps1"
+    . "$PSScriptRoot/../src/ConnectorApi.ps1"
+    . "$PSScriptRoot/../src/DataSourceConnectionInfo.ps1"
     . "$PSScriptRoot/../src/MainOrchestration.ps1"
 
     # New-SectionOutput/Get-SectionHeader/Complete-Report (dot-sourced above) need these set the
@@ -291,6 +293,25 @@ Describe "Get-SagaInfoReportSection" {
         $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com"
 
         $result | Should -Match "OS supported by Saga.*Unavailable"
+    }
+}
+
+Describe "Get-DataSourceConnectionsReportSection" {
+    It "includes the connections summary under a DATA SOURCE CONNECTIONS heading" {
+        Mock Get-DataSourceConnectionsSummary { "NetData (fileserver)" }
+
+        $result = Get-DataSourceConnectionsReportSection "http://localhost/api/connector-broker/v1"
+
+        $result | Should -Match "DATA SOURCE CONNECTIONS"
+        $result | Should -Match "NetData \(fileserver\)"
+    }
+
+    It "degrades gracefully (no crash, 'Unavailable') when the API call fails" {
+        Mock Get-DataSourceConnectionsSummary { throw "connection refused" }
+
+        $result = Get-DataSourceConnectionsReportSection "http://localhost/api/connector-broker/v1"
+
+        $result | Should -Match "Unavailable"
     }
 }
 

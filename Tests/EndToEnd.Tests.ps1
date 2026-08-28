@@ -21,7 +21,7 @@ Describe "Invoke-AyfieInspector end-to-end" {
         $sectionOrder = @(
             "REPORT INFO", "CERTIFICATES", "HOST IDENTITY", "NETWORK", "SYSTEM RESOURCES",
             "RESOURCE USAGE", "FIREWALL OPENINGS", "SCHEDULED RESTART", "SOLR INFO",
-            "CUSTOM REFINERS", "CUSTOM INDEX RULES", "CUSTOM SEARCH RULES"
+            "CUSTOM REFINERS", "DATA SOURCE CONNECTIONS", "CUSTOM INDEX RULES", "CUSTOM SEARCH RULES"
         )
         $previousIndex = -1
         foreach ($section in $sectionOrder) {
@@ -31,6 +31,36 @@ Describe "Invoke-AyfieInspector end-to-end" {
         }
 
         $output | Should -Not -Match "ERROR -->"
+    }
+
+    It "never has two consecutive blank lines between sections" {
+        # Regression test: the seam between Winspect's own report and AyfieInspector's appended
+        # sections (RESOURCE USAGE -> FIREWALL OPENINGS specifically, since RESOURCE USAGE is
+        # Winspect's last section absent the optional GMSA/FILE WRITE ERRORS ones) previously showed
+        # two blank lines where every other section boundary in the report showed exactly one -
+        # Start-AyfieInspector added an extra separator newline on top of the one Winspect's own
+        # New-SectionOutput already appends to every section.
+        Push-Location $TestDrive
+        try {
+            $output = (& $ayfieInspectorScript -outputFormat text -outputDestination terminal -skipFirewallCheck 2>$null) -join "`n"
+        } finally {
+            Pop-Location
+        }
+
+        $reportLines = @($output -split "`r`n")
+        # Trim the trailing blank run first - the report's last section (whichever one it happens
+        # to be) naturally ends with its own trailing blank-line separator with nothing after it,
+        # which isn't the bug; only an interior double-blank, between two sections that both have
+        # content, is.
+        $lastContentIndex = $reportLines.Count - 1
+        while ($lastContentIndex -ge 0 -and $reportLines[$lastContentIndex].Trim() -eq "") {
+            $lastContentIndex--
+        }
+        $contentLines = $reportLines[0..$lastContentIndex]
+        $consecutiveBlankLineIndexes = 0..($contentLines.Count - 2) | Where-Object {
+            $contentLines[$_].Trim() -eq "" -and $contentLines[$_ + 1].Trim() -eq ""
+        }
+        $consecutiveBlankLineIndexes | Should -BeNullOrEmpty
     }
 
     It "writes a report file into the current directory when the destination includes file" {

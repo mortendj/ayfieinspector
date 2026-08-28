@@ -173,6 +173,21 @@ function Get-CustomEnvFileReportSection($installDirPath) {
     return New-SectionOutput "CUSTOM.ENV FILE CONTENT" $lineScriptBlocks
 }
 
+function Get-DataSourceConnectionsReportSection($connectorApiRootUrl) {
+    $dataSourceConnectionsSummary = "Unavailable"
+    try {
+        $dataSourceConnectionsSummary = Get-DataSourceConnectionsSummary $connectorApiRootUrl
+    } catch {
+        Write-Warning "Failed to retrieve data source connections from '$connectorApiRootUrl': $_"
+    }
+    # Plain (unclosed) scriptblock - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "$dataSourceConnectionsSummary" }
+    )
+    return New-SectionOutput "DATA SOURCE CONNECTIONS" $lineScriptBlocks
+}
+
 function Get-AuthenticationMethodReportSection() {
     $authenticationMethodSummary = "Unavailable"
     try {
@@ -301,6 +316,9 @@ function Start-AyfieInspector() {
     Write-Host "Querying custom refiners at $dashboardApiRootUrl/refiners ..."
     $newSectionsRaw += Get-CustomRefinersReportSection $dashboardApiRootUrl
 
+    Write-Host "Querying data source connections at $connectorApiRootUrl ..."
+    $newSectionsRaw += Get-DataSourceConnectionsReportSection $connectorApiRootUrl
+
     Write-Host "Querying rule engine at $dashboardApiRootUrl/rules ..."
     $allRules = @()
     try {
@@ -323,7 +341,12 @@ function Start-AyfieInspector() {
     $formattedNewSectionLines = Complete-Report $newSectionsRaw
     $newSectionsText = $formattedNewSectionLines -join $PHYSICAL_NEWLINE
 
-    $fullReport = $winspectReportText + $PHYSICAL_NEWLINE + $newSectionsText
+    # No extra separator newline here - $winspectReportText already ends with the same trailing
+    # blank line every other section boundary gets (from Winspect's own New-SectionOutput), and
+    # $newSectionsText's first section starts directly with its own header. Adding one here doubled
+    # up the blank line specifically at this one seam (confirmed: RESOURCE USAGE -> FIREWALL
+    # OPENINGS showed two blank lines where every other boundary in the report showed one).
+    $fullReport = $winspectReportText + $newSectionsText
 
     $extension = $TEXT_EXTENSION
     if ($outputFormat -eq $HTML_STYLE) { $extension = $HTML_EXTENSION }
