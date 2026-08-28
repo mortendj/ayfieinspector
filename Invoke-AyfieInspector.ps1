@@ -140,6 +140,7 @@ $SCRIPT_PATH = $PSCommandPath
 . (Join-Path $SRC_DIR "EnvConfigDiffInfo.ps1")
 . (Join-Path $SRC_DIR "ConnectorApi.ps1")
 . (Join-Path $SRC_DIR "DataSourceConnectionInfo.ps1")
+. (Join-Path $SRC_DIR "ConnectorDefinitionInfo.ps1")
 . (Join-Path $SRC_DIR "DatabaseInfo.ps1")
 . (Join-Path $SRC_DIR "DirectorySizeInfo.ps1")
 . (Join-Path $SRC_DIR "DockerInfo.ps1")

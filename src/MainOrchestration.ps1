@@ -554,6 +554,23 @@ function Get-DataSourceConnectionsReportSection($connectorApiRootUrl) {
     return New-SectionOutput "DATA SOURCE CONNECTIONS" $lineScriptBlocks
 }
 
+function Get-DatabaseConnectorConfigurationsReportSection($installDirPath) {
+    $connectorDefinitionSummary = "Unavailable"
+    if ($installDirPath -ne "") {
+        try {
+            $connectorDefinitionSummary = Get-ConnectorDefinitionSummary $installDirPath
+        } catch {
+            Write-Warning "Failed to read database connector configurations: $_"
+        }
+    }
+    # Plain (unclosed) scriptblock - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "$connectorDefinitionSummary" }
+    )
+    return New-SectionOutput "DATABASE CONNECTOR CONFIGURATIONS" $lineScriptBlocks
+}
+
 function Get-AuthenticationMethodReportSection() {
     $authenticationMethodSummary = "Unavailable"
     try {
@@ -725,6 +742,8 @@ function Start-AyfieInspector() {
 
     Write-Host "Querying data source connections at $connectorApiRootUrl ..."
     $newSectionsRaw += Get-DataSourceConnectionsReportSection $connectorApiRootUrl
+
+    $newSectionsRaw += Get-DatabaseConnectorConfigurationsReportSection $resolvedInstallDirPath
 
     Write-Host "Querying rule engine at $dashboardApiRootUrl/rules ..."
     $allRules = @()

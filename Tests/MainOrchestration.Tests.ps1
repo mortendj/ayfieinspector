@@ -20,6 +20,7 @@ BeforeAll {
     . "$PSScriptRoot/../src/EnvConfigDiffInfo.ps1"
     . "$PSScriptRoot/../src/ConnectorApi.ps1"
     . "$PSScriptRoot/../src/DataSourceConnectionInfo.ps1"
+    . "$PSScriptRoot/../src/ConnectorDefinitionInfo.ps1"
     . "$PSScriptRoot/../src/DatabaseInfo.ps1"
     . "$PSScriptRoot/../src/DirectorySizeInfo.ps1"
     . "$PSScriptRoot/../src/DockerInfo.ps1"
@@ -368,6 +369,33 @@ Describe "Get-DataSourceConnectionsReportSection" {
         Mock Get-DataSourceConnectionsSummary { throw "connection refused" }
 
         $result = Get-DataSourceConnectionsReportSection "http://localhost/api/connector-broker/v1"
+
+        $result | Should -Match "Unavailable"
+    }
+}
+
+Describe "Get-DatabaseConnectorConfigurationsReportSection" {
+    It "includes the connector definition summary under a DATABASE CONNECTOR CONFIGURATIONS heading" {
+        Mock Get-ConnectorDefinitionSummary { "Connector: Tidemann`n<page name=`"Database`"></page>" }
+
+        $result = Get-DatabaseConnectorConfigurationsReportSection "C:\Saga\"
+
+        $result | Should -Match "DATABASE CONNECTOR CONFIGURATIONS"
+        $result | Should -Match "Connector: Tidemann"
+    }
+
+    It "reports 'Unavailable' when the install directory couldn't be resolved" {
+        Mock Get-ConnectorDefinitionSummary { throw "should not be called" }
+
+        $result = Get-DatabaseConnectorConfigurationsReportSection ""
+
+        $result | Should -Match "Unavailable"
+    }
+
+    It "degrades gracefully (no crash, 'Unavailable') when reading a definition file fails" {
+        Mock Get-ConnectorDefinitionSummary { throw "access denied" }
+
+        $result = Get-DatabaseConnectorConfigurationsReportSection "C:\Saga\"
 
         $result | Should -Match "Unavailable"
     }

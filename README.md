@@ -8,7 +8,7 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.19.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.20.0). The current release covers the rule engine,
 > custom refiners, Solr info (document count, index languages/memory/stack size/index size), the
 > scheduled restart task, an outbound firewall connectivity check, the Saga gateway certificate,
 > the authentication method, AD/Azure AD data source syncing, database info, backups, Docker
@@ -21,7 +21,8 @@ by hand.
 > from `docker/.env`, the configured chat models), Lingo info (enabled state, container status,
 > licenses, language/data type, and thread/recycle settings), and a diff of the running
 > `docker/.env` against its as-shipped reference (removed/added/modified variables, excluding
-> anything accounted for by `custom.env`).
+> anything accounted for by `custom.env`), and the raw database connector configuration definitions
+> for every connector that has one.
 
 > **Independent, unofficial project.** Not affiliated with, endorsed by, or sponsored by Ayfie
 > Group. "Ayfie", "Ayfie Index", and "Ayfie Locator" are trademarks of their respective owner.
@@ -106,6 +107,12 @@ by hand.
   sensitive-naming convention (`Token`, `Secret`, `Password`, `CompanyGuid`, `Key`) are dropped
   entirely rather than shown or masked - same redaction principle as the custom.env feature above,
   with its own token list since connector setting names follow a different naming convention.
+- **Database connector configurations:** the raw `ConnectorDefinition.xml` content for every
+  connector under `volumes\Connector` that has one, rendered as-is (never re-parsed as anything
+  other than report text) - a real production crash (NGI's Tidemann connector, whose definition
+  contained a double quote) in the older tool this is ported from came from wrapping that same raw
+  XML in a string and evaluating it as PowerShell source, which this project's plain scriptblock
+  report sections never do in the first place.
 - **Saga gateway certificate:** identifies and reports the expiration of the actual Ayfie/Saga
   gateway certificate — a file-backed certificate the generic Windows certificate store scan below
   can never see. Checked both live over HTTPS against the configured gateway hostname (proof of
@@ -301,6 +308,12 @@ NetData (fileserver)
         StartPath=\\host\NetData
         FilenameFilterMode=2
 
+############ DATABASE CONNECTOR CONFIGURATIONS #############
+Connector: Tidemann
+<ConnectorDefinition>
+  <ConnectionString>Server=dbserver.example.com;Database=Tidemann;</ConnectionString>
+</ConnectorDefinition>
+
 #################### CUSTOM INDEX RULES ####################
 Rules:
     Custom Metadata Mapping
@@ -372,6 +385,7 @@ src/
   EnvConfigDiffInfo.ps1          docker/.env vs. as-shipped reference (Ayfie.Saga.zip) diff
   ConnectorApi.ps1               connector-broker API wrapper (installed connectors, connections, settings)
   DataSourceConnectionInfo.ps1   data source connections summary, settings redacted
+  ConnectorDefinitionInfo.ps1    raw per-connector ConnectorDefinition.xml content
   DatabaseInfo.ps1               database type/name/user/server/port, AD/Azure AD sync flag
   DirectorySizeInfo.ps1          recursive directory size scan, invariant-culture formatted
   DockerInfo.ps1                 running containers/images, running connector containers

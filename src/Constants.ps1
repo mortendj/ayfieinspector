@@ -3,7 +3,7 @@
 # Named distinctly from Winspect's own $SCRIPT_VERSION/$SCRIPT_NAME (Constants.ps1) - Invoke-
 # AyfieInspector.ps1 dot-sources Winspect's Constants.ps1 too, and those names are already claimed
 # there.
-$AYFIE_INSPECTOR_VERSION           = "0.19.0"
+$AYFIE_INSPECTOR_VERSION           = "0.20.0"
 $AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-28"
 $AYFIE_INSPECTOR_NAME              = "AyfieInspector"
 $AYFIE_INSPECTOR_VERSION_STRING    = "$AYFIE_INSPECTOR_NAME v. $AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
@@ -108,6 +108,11 @@ $BACKUP_RELATIVE_PATH = "backup/data"
 ################## DOCKER ##################
 
 $CONNECTOR_CONTAINER_NAME_PATTERN = "ayfie-connector-(\w+)"
+
+################## DATABASE CONNECTOR CONFIGURATIONS ##################
+
+$CONNECTORS_ROOT_RELATIVE_PATH       = "volumes\Connector"
+$CONNECTOR_DEFINITION_RELATIVE_PATH  = "ConnectorDefinition\ConnectorDefinition.xml"
 
 ################## CONNECTORS ##################
 
