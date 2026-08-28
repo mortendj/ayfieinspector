@@ -4,9 +4,12 @@ BeforeAll {
     . "$PSScriptRoot/../../Winspect/src/Constants.ps1"
     . "$PSScriptRoot/../../Winspect/src/Logging.ps1"
     . "$PSScriptRoot/../../Winspect/src/Utilities.ps1"
+    . "$PSScriptRoot/../../Winspect/src/ReportFormatting.ps1"
     . "$PSScriptRoot/../src/Constants.ps1"
     . "$PSScriptRoot/../src/ConnectorApi.ps1"
     . "$PSScriptRoot/../src/DataSourceConnectionInfo.ps1"
+
+    Initialize-OutputFormatLayout "text"
 
     function New-FakeSetting($name, $value) {
         return [pscustomobject]@{ settingName = $name; settingValue = $value }
@@ -37,6 +40,40 @@ Describe "Get-SecurityClearedConnectionSettings" {
     }
 }
 
+Describe "Get-ConnectionPropertyAsLines" {
+    It "renders a scalar property inline, on a single line" {
+        $result = Get-ConnectionPropertyAsLines "sharingGroupKey" "abc123" 1
+
+        $result.Count | Should -Be 1
+        $result[0] | Should -Match "sharingGroupKey: abc123"
+    }
+
+    It "renders a nested object's own properties on indented lines beneath its name" {
+        $security = [pscustomobject]@{ authRealm = "saga"; requiresAuthentication = $true }
+
+        $result = Get-ConnectionPropertyAsLines "security" $security 1
+        $resultText = $result -join "`n"
+
+        $result[0] | Should -Match "security:"
+        $resultText | Should -Match "authRealm: saga"
+        $resultText | Should -Match "requiresAuthentication: True"
+    }
+
+    It "renders an array of nested objects, each contributing its own properties" {
+        $repositories = @(
+            [pscustomobject]@{ name = "Repo1"; path = "\\host\Repo1" },
+            [pscustomobject]@{ name = "Repo2"; path = "\\host\Repo2" }
+        )
+
+        $result = Get-ConnectionPropertyAsLines "repositories" $repositories 1
+        $resultText = $result -join "`n"
+
+        $result[0] | Should -Match "repositories:"
+        $resultText | Should -Match "name: Repo1"
+        $resultText | Should -Match "name: Repo2"
+    }
+}
+
 Describe "Get-DataSourceConnectionSummary" {
     It "includes the display name, connector name, enabled state, document count, and settings" {
         $connection = [pscustomobject]@{
@@ -49,6 +86,46 @@ Describe "Get-DataSourceConnectionSummary" {
         $result | Should -Match "Enabled: True"
         $result | Should -Match "Document count: 44907"
         $result | Should -Match "StartPath=\\\\host\\NetData"
+    }
+
+    It "includes extra fields the connection API happens to return - e.g. repositories, security - rather than silently dropping them" {
+        # Regression coverage for the older tool this is ported from, which dumps every property
+        # of the raw connection object generically instead of hand-picking a fixed field list -
+        # this project previously only rendered displayName/connectorName/isEnabled/documentCount.
+        $connection = [pscustomobject]@{
+            displayName = "NetData"; connectorName = "fileserver"; isEnabled = $true; documentCount = 44907
+            security = [pscustomobject]@{ authRealm = "saga" }
+            repositories = @([pscustomobject]@{ name = "Repo1" })
+        }
+
+        $result = Get-DataSourceConnectionSummary $connection ""
+
+        $result | Should -Match "security:"
+        $result | Should -Match "authRealm: saga"
+        $result | Should -Match "repositories:"
+        $result | Should -Match "name: Repo1"
+    }
+
+    It "never renders the well-known fields a second time as generic extras" {
+        $connection = [pscustomobject]@{
+            id = 1; displayName = "NetData"; connectorName = "fileserver"; isEnabled = $true; documentCount = 44907
+        }
+
+        $result = Get-DataSourceConnectionSummary $connection ""
+        $idOccurrences = @([regex]::Matches($result, "(?m)^id:")).Count
+
+        $idOccurrences | Should -Be 0
+    }
+
+    It "skips a null-valued extra field entirely rather than rendering an empty line for it" {
+        $connection = [pscustomobject]@{
+            displayName = "NetData"; connectorName = "fileserver"; isEnabled = $true; documentCount = 44907
+            repositoryStates = $null
+        }
+
+        $result = Get-DataSourceConnectionSummary $connection ""
+
+        $result | Should -Not -Match "repositoryStates"
     }
 }
 

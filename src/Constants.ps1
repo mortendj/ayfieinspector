@@ -3,7 +3,7 @@
 # Named distinctly from Winspect's own $SCRIPT_VERSION/$SCRIPT_NAME (Constants.ps1) - Invoke-
 # AyfieInspector.ps1 dot-sources Winspect's Constants.ps1 too, and those names are already claimed
 # there.
-$AYFIE_INSPECTOR_VERSION           = "0.21.0"
+$AYFIE_INSPECTOR_VERSION           = "0.22.0"
 $AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-28"
 $AYFIE_INSPECTOR_NAME              = "AyfieInspector"
 $AYFIE_INSPECTOR_VERSION_STRING    = "$AYFIE_INSPECTOR_NAME v. $AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
@@ -88,6 +88,12 @@ $SENSITIVE_ENV_TOKENS     = @("PASSWORD", "SECRET", "API_KEY", "API_TOKEN")
 # discover its own settings redaction missed a connector's AuthKey field - see
 # project_ayfieinspector_gateway_cert_feature.md for that writeup).
 $SENSITIVE_CONN_TOKENS = @("Token", "Secret", "Password", "CompanyGuid", "Key")
+
+# Connection API responses carry more than these five fields - e.g. repositories, security - that
+# the older tool this is ported from renders too, generically, rather than silently dropping
+# anything not on a fixed field list. Anything not in this list gets rendered by
+# Get-DataSourceConnectionSummary without needing to know its exact name or shape in advance.
+$DATA_SOURCE_CONNECTION_WELL_KNOWN_PROPERTIES = @("id", "displayName", "connectorName", "isEnabled", "documentCount")
 
 ################## DATABASE INFO ##################
 

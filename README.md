@@ -8,7 +8,7 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.21.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.22.0). The current release covers the rule engine,
 > custom refiners, Solr info (document count, index languages/memory/stack size/index size), the
 > scheduled restart task, an outbound firewall connectivity check, the Saga gateway certificate,
 > the authentication method, AD/Azure AD data source syncing, database info, backups, Docker
@@ -16,7 +16,8 @@ by hand.
 > Saga version, branding, gateway hostname, OS support status, installed/in-use connectors), Saga
 > license info (customer ID, activation/expiration dates, user/document capacity, licensed
 > features), the redacted `custom.env` file content, the data source connections (with settings
-> redacted), Supervisor info (report engine container status, license, Lingo configuration),
+> redacted, plus any other fields the connection API happens to return, e.g. repositories/security),
+> Supervisor info (report engine container status, license, Lingo configuration),
 > Personal Assistant info (operational mode and, on Saga versions before the models were dropped
 > from `docker/.env`, the configured chat models), Lingo info (enabled state, container status,
 > licenses, language/data type, and thread/recycle settings), and a diff of the running
@@ -107,7 +108,10 @@ by hand.
   document count) and their settings, queried from the connector-broker API. Settings matching a
   sensitive-naming convention (`Token`, `Secret`, `Password`, `CompanyGuid`, `Key`) are dropped
   entirely rather than shown or masked - same redaction principle as the custom.env feature above,
-  with its own token list since connector setting names follow a different naming convention.
+  with its own token list since connector setting names follow a different naming convention. Any
+  other field the API happens to return for a connection - e.g. `repositories`, `security` - is
+  rendered too, generically (recursing into nested objects/arrays), rather than silently dropped by
+  a fixed field list.
 - **Database connector configurations:** the raw `ConnectorDefinition.xml` content for every
   connector under `volumes\Connector` that has one, rendered as-is (never re-parsed as anything
   other than report text) - a real production crash (NGI's Tidemann connector, whose definition
@@ -314,6 +318,11 @@ ayfiehub/gateway-keycloak:6.1.0
 NetData (fileserver)
     Enabled: True
     Document count: 44907
+    security:
+        authRealm: saga
+    repositories:
+        name: Repo1
+        path: \\host\Repo1
     Settings:
         StartPath=\\host\NetData
         FilenameFilterMode=2
@@ -394,7 +403,7 @@ src/
   EnvFileInfo.ps1                custom.env file content, redacted
   EnvConfigDiffInfo.ps1          docker/.env vs. as-shipped reference (Ayfie.Saga.zip) diff
   ConnectorApi.ps1               connector-broker API wrapper (installed connectors, connections, settings)
-  DataSourceConnectionInfo.ps1   data source connections summary, settings redacted
+  DataSourceConnectionInfo.ps1   data source connections summary (incl. generic extra fields), settings redacted
   ConnectorDefinitionInfo.ps1    raw per-connector ConnectorDefinition.xml content
   DatabaseInfo.ps1               database type/name/user/server/port, AD/Azure AD sync flag
   DirectorySizeInfo.ps1          recursive directory size scan, invariant-culture formatted
