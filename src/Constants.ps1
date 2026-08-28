@@ -3,7 +3,7 @@
 # Named distinctly from Winspect's own $SCRIPT_VERSION/$SCRIPT_NAME (Constants.ps1) - Invoke-
 # AyfieInspector.ps1 dot-sources Winspect's Constants.ps1 too, and those names are already claimed
 # there.
-$AYFIE_INSPECTOR_VERSION           = "0.17.0"
+$AYFIE_INSPECTOR_VERSION           = "0.18.0"
 $AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-28"
 $AYFIE_INSPECTOR_NAME              = "AyfieInspector"
 $AYFIE_INSPECTOR_VERSION_STRING    = "$AYFIE_INSPECTOR_NAME v. $AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
@@ -118,6 +118,44 @@ $CONNECTOR_PLUGIN_PREFIX         = "connector-"
 
 $LICENSING_API_PATH      = "api/licensing/v1/ProductLicense"
 $PERPETUAL_LICENSE_LABEL = "Perpetual"
+
+################## SUPERVISOR INFO ##################
+
+$REPORT_ENGINE_CONTAINER_NAME = "report-engine-ui"
+$REPORT_ENGINE_LICENSE        = "Report Engine"
+
+################## PERSONAL ASSISTANT ##################
+
+$PA_MODE_KEY               = "AYFIE_SEARCH_UI_FEATURE_CHAT"
+$PA_MAIN_MODEL_KEY         = "AYFIE_CHAT_MAIN_MODEL_DEPLOYMENT"
+$PA_HQ_MODEL_KEY           = "AYFIE_CHAT_HQ_MODEL_DEPLOYMENT"
+$PA_HQ_PLUS_MODEL_KEY      = "AYFIE_CHAT_HQ_PLUS_MODEL_DEPLOYMENT"
+$PA_MAIN_MODEL_NAME_KEY    = "AYFIE_CHAT_MAIN_MODEL_DISPLAY_NAME"
+$PA_HQ_MODEL_NAME_KEY      = "AYFIE_CHAT_HQ_MODEL_DISPLAY_NAME"
+$PA_HQ_PLUS_MODEL_NAME_KEY = "AYFIE_CHAT_HQ_PLUS_MODEL_DISPLAY_NAME"
+
+# Model deployment settings were explicitly stripped from docker/.env by the Saga 6->7 upgrade
+# script (confirmed in index repo's TEMPLATE-upgrade-saga6-to-saga7.ps1, $PA_VARIABLES_TO_REMOVE) -
+# models are configured through the Agent app's own System Settings wizard from Saga 7 onward, not
+# via .env. Matches ConfigInspector's own major-version gate for this section.
+$PA_MODEL_FIELDS_DROPPED_FROM_SAGA_MAJOR_VERSION = 7
+
+################## LINGO INFO ##################
+
+$LINGO_CONTAINER_NAME   = "ayfie-lingo"
+$LINGO_STANDARD_LICENSE = "Lingo Standard"
+$LINGO_GDPR_LICENSE     = "Lingo GDPR"
+
+$LINGO_ENABLED_KEY      = "AYFIE_LINGO"
+$LINGO_IMAGE_ID_KEY     = "AYFIE_LINGO_EXTRACTION_IMAGE_ID"
+$LINGO_PII_LANGUAGE_KEY = "AYFIE_LINGO_EXTRACTION_PII_LANGUAGE_ID"
+$LINGO_THREADS_KEY      = "AYFIE_LINGO_PIPELINE_POOL_SIZE"
+$LINGO_RECYCLE_MEM_KEY  = "AYFIE_LINGO_RECYCLE_ON_MEMORY_THRESHOLD_IN_MB"
+$LINGO_RECYCLE_RUNS_KEY = "AYFIE_LINGO_RECYCLE_AFTER_RUNS"
+$LINGO_RECYCLE_TIME_KEY = "AYFIE_LINGO_RECYCLE_AFTER_PROCESSING_TIME_IN_SECONDS"
+
+$LINGO_PII_LABEL = "pii"
+$LINGO_LANGUAGES = @('da', 'en', 'fr', 'de', 'it', 'nb', 'pl', 'pt', 'es', 'sv')
 
 ################## SCHEDULED RESTART ##################
 

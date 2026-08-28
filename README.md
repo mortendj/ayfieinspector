@@ -8,15 +8,18 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.17.0). The current release covers the rule engine,
+> **Status:** early, actively developed (v0.18.0). The current release covers the rule engine,
 > custom refiners, Solr info (document count, index languages/memory/stack size/index size), the
 > scheduled restart task, an outbound firewall connectivity check, the Saga gateway certificate,
 > the authentication method, AD/Azure AD data source syncing, database info, backups, Docker
 > images currently in use, an optional gMSA account check, installation info (install directory,
 > Saga version, branding, gateway hostname, OS support status, installed/in-use connectors), Saga
 > license info (customer ID, activation/expiration dates, user/document capacity, licensed
-> features), the redacted `custom.env` file content, and the data source connections (with
-> settings redacted).
+> features), the redacted `custom.env` file content, the data source connections (with settings
+> redacted), Supervisor info (report engine container status, license, Lingo configuration),
+> Personal Assistant info (operational mode and, on Saga versions before the models were dropped
+> from `custom.env`, the configured chat models), and Lingo info (enabled state, container status,
+> licenses, language/data type, and thread/recycle settings).
 
 > **Independent, unofficial project.** Not affiliated with, endorsed by, or sponsored by Ayfie
 > Group. "Ayfie", "Ayfie Index", and "Ayfie Locator" are trademarks of their respective owner.
@@ -55,6 +58,18 @@ by hand.
   installation's `.env`.
 - **Database info:** database type, name, user, server, and port, from the running installation's
   `.env`.
+- **Supervisor info:** the report engine (`report-engine-ui`) container's running status, whether
+  the license includes the Report Engine capability, and its Lingo configuration - the same
+  language/data-type value the Lingo info section below reports, since the report engine consumes
+  Lingo's output directly.
+- **Personal Assistant info:** the operational mode (`off`, `limited`, or `full`), and - only on Saga versions
+  before major version 7, matching when the internal tool this is ported from stops reporting them
+  - the configured main/high-quality/high-quality-plus chat models and their display names, from
+    the running installation's `.env`.
+- **Lingo info:** whether Lingo is enabled, the `ayfie-lingo` container's running status, whether
+  the license includes the Lingo Standard and Lingo GDPR capabilities, the configured
+  language/data-type (regular or PII), and the pipeline thread count and recycle
+  (memory/runs/time) settings, from the running installation's `.env`.
 - **Backups:** number of backups found, the most recent backup's timestamp, and the total size on
   disk of the backup directory.
 - **Docker images currently in use:** the image:tag of every currently running container.
@@ -223,6 +238,25 @@ Database user: postgres
 Database server: dbserver.example.com
 Database port: 1433
 
+###################### SUPERVISOR INFO #####################
+Report engine container: Running
+Report engine license: Has license
+Report engine Lingo configuration: nb (regular, not PII)
+
+#################### PERSONAL ASSISTANT ####################
+Operational mode: full
+
+######################## LINGO INFO ########################
+Lingo enabled: true
+Lingo container: Running
+Lingo standard license: Has license
+Lingo GDPR license: No license
+Lingo language (and data type): nb (regular, not PII)
+Lingo threads (a.k.a pipeline pool size): 4
+Lingo recycle memory threshold: 2048
+Lingo recycle runs: 1000
+Lingo recycle time (seconds): 3600
+
 ######################## SOLR INFO #########################
 Solr index languages: en;nb
 Solr java memory: -Xms8g -Xmx8g
@@ -328,6 +362,8 @@ src/
   DockerInfo.ps1                 running containers/images, running connector containers
   BackupInfo.ps1                 backup count, latest backup, total size
   LicenseInfo.ps1                Saga license info (customer ID, dates, capacity, features)
+  LingoInfo.ps1                  Lingo enabled state, language/data type, thread/recycle settings
+  PersonalAssistantInfo.ps1      Personal Assistant operational mode and configured chat models
   MainOrchestration.ps1          builds each report section and assembles the combined report
 ```
 

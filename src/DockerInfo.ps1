@@ -14,6 +14,19 @@ function Get-DockerImagesOfRunningContainers() {
     Write-ReturnValue ($images -join $PHYSICAL_NEWLINE)
 }
 
+function Get-ContainerStatus($containerName) {
+    Write-FunctionCallLog $PSBoundParameters
+    $runningContainerNames = Get-RunningContainerNames
+    $status = "Not running"
+    foreach ($runningContainerName in $runningContainerNames) {
+        if ($runningContainerName -match $containerName) {
+            $status = "Running"
+            break
+        }
+    }
+    Write-ReturnValue $status
+}
+
 function Get-RunningConnectorNames() {
     Write-FunctionCallLog $PSBoundParameters
     $containerNames = Get-RunningContainerNames

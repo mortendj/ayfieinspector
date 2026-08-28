@@ -20,6 +20,20 @@ Describe "Get-RunningContainerNames" {
     }
 }
 
+Describe "Get-ContainerStatus" {
+    It "reports 'Running' when a container name matching the pattern is among the running containers" {
+        Mock Get-RunningContainerNames { @("ayfie-saga-authority-db", "report-engine-ui") }
+
+        Get-ContainerStatus "report-engine-ui" | Should -Be "Running"
+    }
+
+    It "reports 'Not running' when no running container name matches" {
+        Mock Get-RunningContainerNames { @("ayfie-saga-authority-db") }
+
+        Get-ContainerStatus "report-engine-ui" | Should -Be "Not running"
+    }
+}
+
 Describe "Get-DockerImagesOfRunningContainers" {
     It "joins the image list into newline-separated text" {
         Mock Invoke-ExternalCommand { @("ayfiehub/locator:7.3.1", "ayfiehub/solr:7.4.0") }

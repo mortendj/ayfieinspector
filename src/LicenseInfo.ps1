@@ -104,3 +104,19 @@ function Get-DaysUntilSagaLicenseExpires($licenseSummary) {
     }
     Write-ReturnValue (New-TimeSpan -Start (Get-Date) -End $licenseSummary.EarliestExpirationDate).Days
 }
+
+function Test-HasSagaLicenseCapability($licenseSummary, $capability) {
+    Write-FunctionCallLog $PSBoundParameters
+    # $licenseSummary.Features is the same "CapabilityType: DisplayName" join built in
+    # Get-SagaLicenseSummary above - a capability is licensed exactly when its name shows up
+    # somewhere in that text, matching how the older tool this is ported from checks the same thing.
+    if ($null -eq $licenseSummary -or $null -eq $licenseSummary.Features) {
+        Write-ReturnValue "Unavailable"
+        return
+    }
+    if ($licenseSummary.Features -like "*$capability*") {
+        Write-ReturnValue "Has license"
+    } else {
+        Write-ReturnValue "No license"
+    }
+}

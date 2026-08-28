@@ -342,6 +342,124 @@ function Get-DatabaseInfoReportSection($installDirPath) {
     return New-SectionOutput "DATABASE INFO" $lineScriptBlocks
 }
 
+function Get-SupervisorInfoReportSection($installDirPath, $licenseSummary) {
+    $reportEngineContainerStatus = "Unavailable"
+    try {
+        $reportEngineContainerStatus = Get-ContainerStatus $REPORT_ENGINE_CONTAINER_NAME
+    } catch {
+        Write-Warning "Failed to determine the report engine container status: $_"
+    }
+    $reportEngineLicense = "Unavailable"
+    try {
+        $reportEngineLicense = Test-HasSagaLicenseCapability $licenseSummary $REPORT_ENGINE_LICENSE
+    } catch {
+        Write-Warning "Failed to determine the report engine license status: $_"
+    }
+    $lingoConfiguration = "Unavailable"
+    if ($installDirPath -ne "") {
+        try {
+            $lingoConfiguration = Get-LingoDataTypeAndLanguage $installDirPath
+        } catch {
+            Write-Warning "Failed to determine the report engine's Lingo configuration: $_"
+        }
+    }
+    # Plain (unclosed) scriptblocks - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "Report engine container$FIELD_LABEL_SEPARATOR$reportEngineContainerStatus" },
+        { "Report engine license$FIELD_LABEL_SEPARATOR$reportEngineLicense" },
+        { "Report engine Lingo configuration$FIELD_LABEL_SEPARATOR$lingoConfiguration" }
+    )
+    return New-SectionOutput "SUPERVISOR INFO" $lineScriptBlocks
+}
+
+function Get-PersonalAssistantReportSection($installDirPath) {
+    $personalAssistantInfo = [pscustomobject]@{
+        Mode = "Unavailable"; MainModel = $null; MainModelDisplayName = $null
+        HighQualityModel = $null; HighQualityModelDisplayName = $null
+        HighQualityPlusModel = $null; HighQualityPlusModelDisplayName = $null
+    }
+    if ($installDirPath -ne "") {
+        try {
+            $personalAssistantInfo = Get-PersonalAssistantInfo $installDirPath
+        } catch {
+            Write-Warning "Failed to determine Personal Assistant info: $_"
+        }
+    }
+    # Plain (unclosed) scriptblock - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "Operational mode$FIELD_LABEL_SEPARATOR$($personalAssistantInfo.Mode)" }
+    )
+    # Model deployment fields were stripped out of docker/.env by the Saga 6->7 upgrade script -
+    # see the note on $PA_MODEL_FIELDS_DROPPED_FROM_SAGA_MAJOR_VERSION (Constants.ps1) - and matches
+    # ConfigInspector's own major-version gate for this section. Defaults to including the fields
+    # (major version 0) when the Saga version itself can't be determined, since showing
+    # "Unavailable" values is more informative than silently hiding the whole block.
+    $sagaMajorVersion = 0
+    try {
+        $sagaVersion = Get-SagaVersion $installDirPath
+        if ($sagaVersion -match "^(\d+)") {
+            $sagaMajorVersion = [int]$Matches[1]
+        }
+    } catch {
+        Write-Warning "Failed to determine the Saga version for the Personal Assistant model gate: $_"
+    }
+    if ($sagaMajorVersion -lt $PA_MODEL_FIELDS_DROPPED_FROM_SAGA_MAJOR_VERSION) {
+        $lineScriptBlocks += @(
+            { "Main model$FIELD_LABEL_SEPARATOR$($personalAssistantInfo.MainModel)" },
+            { "Main model display name$FIELD_LABEL_SEPARATOR$($personalAssistantInfo.MainModelDisplayName)" },
+            { "High quality model$FIELD_LABEL_SEPARATOR$($personalAssistantInfo.HighQualityModel)" },
+            { "High quality model display name$FIELD_LABEL_SEPARATOR$($personalAssistantInfo.HighQualityModelDisplayName)" },
+            { "High quality plus model$FIELD_LABEL_SEPARATOR$($personalAssistantInfo.HighQualityPlusModel)" },
+            { "High quality plus model display name$FIELD_LABEL_SEPARATOR$($personalAssistantInfo.HighQualityPlusModelDisplayName)" }
+        )
+    }
+    return New-SectionOutput "PERSONAL ASSISTANT" $lineScriptBlocks
+}
+
+function Get-LingoInfoReportSection($installDirPath, $licenseSummary) {
+    $lingoInfo = [pscustomobject]@{
+        Enabled = "Unavailable"; DataTypeAndLanguage = "Unavailable"; Threads = "Unavailable"
+        RecycleMemoryThresholdMb = "Unavailable"; RecycleRuns = "Unavailable"; RecycleTimeSeconds = "Unavailable"
+    }
+    if ($installDirPath -ne "") {
+        try {
+            $lingoInfo = Get-LingoInfo $installDirPath
+        } catch {
+            Write-Warning "Failed to determine Lingo info: $_"
+        }
+    }
+    $lingoContainerStatus = "Unavailable"
+    try {
+        $lingoContainerStatus = Get-ContainerStatus $LINGO_CONTAINER_NAME
+    } catch {
+        Write-Warning "Failed to determine the Lingo container status: $_"
+    }
+    $lingoStandardLicense = "Unavailable"
+    $lingoGdprLicense = "Unavailable"
+    try {
+        $lingoStandardLicense = Test-HasSagaLicenseCapability $licenseSummary $LINGO_STANDARD_LICENSE
+        $lingoGdprLicense = Test-HasSagaLicenseCapability $licenseSummary $LINGO_GDPR_LICENSE
+    } catch {
+        Write-Warning "Failed to determine Lingo license status: $_"
+    }
+    # Plain (unclosed) scriptblocks - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "Lingo enabled$FIELD_LABEL_SEPARATOR$($lingoInfo.Enabled)" },
+        { "Lingo container$FIELD_LABEL_SEPARATOR$lingoContainerStatus" },
+        { "Lingo standard license$FIELD_LABEL_SEPARATOR$lingoStandardLicense" },
+        { "Lingo GDPR license$FIELD_LABEL_SEPARATOR$lingoGdprLicense" },
+        { "Lingo language (and data type)$FIELD_LABEL_SEPARATOR$($lingoInfo.DataTypeAndLanguage)" },
+        { "Lingo threads (a.k.a pipeline pool size)$FIELD_LABEL_SEPARATOR$($lingoInfo.Threads)" },
+        { "Lingo recycle memory threshold$FIELD_LABEL_SEPARATOR$($lingoInfo.RecycleMemoryThresholdMb)" },
+        { "Lingo recycle runs$FIELD_LABEL_SEPARATOR$($lingoInfo.RecycleRuns)" },
+        { "Lingo recycle time (seconds)$FIELD_LABEL_SEPARATOR$($lingoInfo.RecycleTimeSeconds)" }
+    )
+    return New-SectionOutput "LINGO INFO" $lineScriptBlocks
+}
+
 function Get-DockerImagesReportSection() {
     $dockerImages = "Unavailable"
     try {
@@ -562,6 +680,12 @@ function Start-AyfieInspector() {
     $newSectionsRaw += Get-ScheduledRestartReportSection
 
     $newSectionsRaw += Get-DatabaseInfoReportSection $resolvedInstallDirPath
+
+    $newSectionsRaw += Get-SupervisorInfoReportSection $resolvedInstallDirPath $resolvedLicenseSummary
+
+    $newSectionsRaw += Get-PersonalAssistantReportSection $resolvedInstallDirPath
+
+    $newSectionsRaw += Get-LingoInfoReportSection $resolvedInstallDirPath $resolvedLicenseSummary
 
     Write-Host "Querying source reference count at $dashboardApiRootUrl/sourcereference/count ..."
     $newSectionsRaw += Get-SolrInfoReportSection $dashboardApiRootUrl $resolvedInstallDirPath

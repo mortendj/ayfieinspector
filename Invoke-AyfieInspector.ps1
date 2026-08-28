@@ -144,6 +144,8 @@ $SCRIPT_PATH = $PSCommandPath
 . (Join-Path $SRC_DIR "DockerInfo.ps1")
 . (Join-Path $SRC_DIR "BackupInfo.ps1")
 . (Join-Path $SRC_DIR "LicenseInfo.ps1")
+. (Join-Path $SRC_DIR "LingoInfo.ps1")
+. (Join-Path $SRC_DIR "PersonalAssistantInfo.ps1")
 . (Join-Path $SRC_DIR "MainOrchestration.ps1")
 
 Start-AyfieInspector

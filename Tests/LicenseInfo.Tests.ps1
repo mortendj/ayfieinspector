@@ -187,3 +187,27 @@ Describe "Get-DaysUntilSagaLicenseExpires" {
         Get-DaysUntilSagaLicenseExpires $summary | Should -BeIn @(29, 30)
     }
 }
+
+Describe "Test-HasSagaLicenseCapability" {
+    It "reports 'Has license' when the capability name appears in Features" {
+        $summary = [pscustomobject]@{ Features = "Connector: File Server Connector`nReport Engine: Report Engine" }
+
+        Test-HasSagaLicenseCapability $summary "Report Engine" | Should -Be "Has license"
+    }
+
+    It "reports 'No license' when the capability name does not appear in Features" {
+        $summary = [pscustomobject]@{ Features = "Connector: File Server Connector" }
+
+        Test-HasSagaLicenseCapability $summary "Report Engine" | Should -Be "No license"
+    }
+
+    It "reports 'Unavailable' when the license summary is null (resolution failed entirely)" {
+        Test-HasSagaLicenseCapability $null "Report Engine" | Should -Be "Unavailable"
+    }
+
+    It "reports 'Unavailable' when Features itself is null (no valid license at all)" {
+        $summary = [pscustomobject]@{ Features = $null }
+
+        Test-HasSagaLicenseCapability $summary "Report Engine" | Should -Be "Unavailable"
+    }
+}

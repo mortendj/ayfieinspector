@@ -24,6 +24,8 @@ BeforeAll {
     . "$PSScriptRoot/../src/DockerInfo.ps1"
     . "$PSScriptRoot/../src/BackupInfo.ps1"
     . "$PSScriptRoot/../src/LicenseInfo.ps1"
+    . "$PSScriptRoot/../src/LingoInfo.ps1"
+    . "$PSScriptRoot/../src/PersonalAssistantInfo.ps1"
     . "$PSScriptRoot/../src/MainOrchestration.ps1"
 
     # New-SectionOutput/Get-SectionHeader/Complete-Report (dot-sourced above) need these set the
@@ -420,6 +422,149 @@ Describe "Get-DatabaseInfoReportSection" {
         $result = Get-DatabaseInfoReportSection "C:\Saga\"
 
         $result | Should -Match "Database type.*Unavailable"
+    }
+}
+
+Describe "Get-SupervisorInfoReportSection" {
+    It "includes the report engine container status, license, and Lingo configuration" {
+        Mock Get-ContainerStatus { "Running" }
+        Mock Test-HasSagaLicenseCapability { "Has license" }
+        Mock Get-LingoDataTypeAndLanguage { "nb (regular, not PII)" }
+
+        $result = Get-SupervisorInfoReportSection "C:\Saga\" ([pscustomobject]@{ Features = "Report Engine" })
+
+        $result | Should -Match "SUPERVISOR INFO"
+        $result | Should -Match "Report engine container.*Running"
+        $result | Should -Match "Report engine license.*Has license"
+        $result | Should -Match "Report engine Lingo configuration.*nb \(regular, not PII\)"
+    }
+
+    It "reports 'Unavailable' for the Lingo configuration when the install directory couldn't be resolved" {
+        Mock Get-ContainerStatus { "Not running" }
+        Mock Test-HasSagaLicenseCapability { "No license" }
+        Mock Get-LingoDataTypeAndLanguage { throw "should not be called" }
+
+        $result = Get-SupervisorInfoReportSection "" $null
+
+        $result | Should -Match "Report engine Lingo configuration.*Unavailable"
+    }
+
+    It "degrades gracefully to 'Unavailable' when the container status check itself fails" {
+        Mock Get-ContainerStatus { throw "docker not available" }
+        Mock Test-HasSagaLicenseCapability { "Has license" }
+        Mock Get-LingoDataTypeAndLanguage { "nb (regular, not PII)" }
+
+        $result = Get-SupervisorInfoReportSection "C:\Saga\" ([pscustomobject]@{ Features = "Report Engine" })
+
+        $result | Should -Match "Report engine container.*Unavailable"
+    }
+}
+
+Describe "Get-PersonalAssistantReportSection" {
+    It "includes all seven fields when the Saga version is older than the model-fields cutoff" {
+        Mock Get-SagaVersion { "6.4.0" }
+        Mock Get-PersonalAssistantInfo {
+            [pscustomobject]@{
+                Mode = "full"; MainModel = "gpt-4o"; MainModelDisplayName = "GPT-4o"
+                HighQualityModel = "gpt-4o-hq"; HighQualityModelDisplayName = "GPT-4o HQ"
+                HighQualityPlusModel = "gpt-4o-hq-plus"; HighQualityPlusModelDisplayName = "GPT-4o HQ+"
+            }
+        }
+
+        $result = Get-PersonalAssistantReportSection "C:\Saga\"
+
+        $result | Should -Match "PERSONAL ASSISTANT"
+        $result | Should -Match "Operational mode.*full"
+        $result | Should -Match "Main model.*gpt-4o"
+        $result | Should -Match "Main model display name.*GPT-4o"
+        $result | Should -Match "High quality model.*gpt-4o-hq"
+        $result | Should -Match "High quality plus model.*gpt-4o-hq-plus"
+    }
+
+    It "omits the model fields entirely once the Saga version reaches the cutoff" {
+        Mock Get-SagaVersion { "7.19.0" }
+        Mock Get-PersonalAssistantInfo {
+            [pscustomobject]@{
+                Mode = "full"; MainModel = "gpt-4o"; MainModelDisplayName = "GPT-4o"
+                HighQualityModel = $null; HighQualityModelDisplayName = $null
+                HighQualityPlusModel = $null; HighQualityPlusModelDisplayName = $null
+            }
+        }
+
+        $result = Get-PersonalAssistantReportSection "C:\Saga\"
+
+        $result | Should -Match "Operational mode.*full"
+        $result | Should -Not -Match "Main model"
+    }
+
+    It "reports 'Unavailable' and still includes the model fields when the install directory couldn't be resolved" {
+        Mock Get-PersonalAssistantInfo { throw "should not be called" }
+
+        $result = Get-PersonalAssistantReportSection ""
+
+        $result | Should -Match "Operational mode.*Unavailable"
+        $result | Should -Match "Main model"
+    }
+
+    It "degrades gracefully to 'Unavailable' when the lookup itself fails" {
+        Mock Get-SagaVersion { "7.19.0" }
+        Mock Get-PersonalAssistantInfo { throw "file not found" }
+
+        $result = Get-PersonalAssistantReportSection "C:\Saga\"
+
+        $result | Should -Match "Operational mode.*Unavailable"
+    }
+}
+
+Describe "Get-LingoInfoReportSection" {
+    It "includes all Lingo fields, container status, and both license checks when everything succeeds" {
+        Mock Get-LingoInfo {
+            [pscustomobject]@{
+                Enabled = "true"; DataTypeAndLanguage = "nb (regular, not PII)"; Threads = "4"
+                RecycleMemoryThresholdMb = "2048"; RecycleRuns = "1000"; RecycleTimeSeconds = "3600"
+            }
+        }
+        Mock Get-ContainerStatus { "Running" }
+        Mock Test-HasSagaLicenseCapability { "Has license" }
+
+        $result = Get-LingoInfoReportSection "C:\Saga\" ([pscustomobject]@{ Features = "Lingo Standard`nLingo GDPR" })
+
+        $result | Should -Match "LINGO INFO"
+        $result | Should -Match "Lingo enabled.*true"
+        $result | Should -Match "Lingo container.*Running"
+        $result | Should -Match "Lingo standard license.*Has license"
+        $result | Should -Match "Lingo GDPR license.*Has license"
+        $result | Should -Match "Lingo language \(and data type\).*nb \(regular, not PII\)"
+        $result | Should -Match "Lingo threads.*4"
+        $result | Should -Match "Lingo recycle memory threshold.*2048"
+        $result | Should -Match "Lingo recycle runs.*1000"
+        $result | Should -Match "Lingo recycle time \(seconds\).*3600"
+    }
+
+    It "reports 'Unavailable' for the .env-derived fields when the install directory couldn't be resolved" {
+        Mock Get-LingoInfo { throw "should not be called" }
+        Mock Get-ContainerStatus { "Not running" }
+        Mock Test-HasSagaLicenseCapability { "Unavailable" }
+
+        $result = Get-LingoInfoReportSection "" $null
+
+        $result | Should -Match "Lingo enabled.*Unavailable"
+        $result | Should -Match "Lingo container.*Not running"
+    }
+
+    It "degrades gracefully to 'Unavailable' when the container status check fails" {
+        Mock Get-LingoInfo {
+            [pscustomobject]@{
+                Enabled = "true"; DataTypeAndLanguage = "nb (regular, not PII)"; Threads = "4"
+                RecycleMemoryThresholdMb = "2048"; RecycleRuns = "1000"; RecycleTimeSeconds = "3600"
+            }
+        }
+        Mock Get-ContainerStatus { throw "docker not available" }
+        Mock Test-HasSagaLicenseCapability { "Has license" }
+
+        $result = Get-LingoInfoReportSection "C:\Saga\" ([pscustomobject]@{ Features = "Lingo Standard" })
+
+        $result | Should -Match "Lingo container.*Unavailable"
     }
 }
 
