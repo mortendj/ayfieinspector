@@ -19,6 +19,10 @@ BeforeAll {
     . "$PSScriptRoot/../src/EnvFileInfo.ps1"
     . "$PSScriptRoot/../src/ConnectorApi.ps1"
     . "$PSScriptRoot/../src/DataSourceConnectionInfo.ps1"
+    . "$PSScriptRoot/../src/DatabaseInfo.ps1"
+    . "$PSScriptRoot/../src/DirectorySizeInfo.ps1"
+    . "$PSScriptRoot/../src/DockerInfo.ps1"
+    . "$PSScriptRoot/../src/BackupInfo.ps1"
     . "$PSScriptRoot/../src/MainOrchestration.ps1"
 
     # New-SectionOutput/Get-SectionHeader/Complete-Report (dot-sourced above) need these set the
@@ -136,7 +140,7 @@ Describe "Get-SolrInfoReportSection" {
     It "includes the field label separator between the label and the value" {
         Mock Get-SourceReferenceCount { "1,218,445" }
 
-        $result = Get-SolrInfoReportSection "http://localhost/Dashboard/api"
+        $result = Get-SolrInfoReportSection "http://localhost/Dashboard/api" ""
 
         $result | Should -Match "Source reference count$([regex]::Escape($FIELD_LABEL_SEPARATOR))1,218,445"
     }
@@ -144,9 +148,38 @@ Describe "Get-SolrInfoReportSection" {
     It "reports 'Unavailable' (with the separator still present) when the API call fails" {
         Mock Get-SourceReferenceCount { throw "connection refused" }
 
-        $result = Get-SolrInfoReportSection "http://localhost/Dashboard/api"
+        $result = Get-SolrInfoReportSection "http://localhost/Dashboard/api" ""
 
         $result | Should -Match "Source reference count$([regex]::Escape($FIELD_LABEL_SEPARATOR))Unavailable"
+    }
+
+    It "reports every field as 'Unavailable' when the install directory couldn't be resolved" {
+        Mock Get-SourceReferenceCount { "1,218,445" }
+
+        $result = Get-SolrInfoReportSection "http://localhost/Dashboard/api" ""
+
+        $result | Should -Match "Solr index languages.*Unavailable"
+        $result | Should -Match "Solr java memory.*Unavailable"
+        $result | Should -Match "Solr java stack size.*Unavailable"
+        $result | Should -Match "Solr index size.*Unavailable"
+    }
+
+    It "reads the Solr .env fields and index size when the install directory is known" {
+        Mock Get-SourceReferenceCount { "1,218,445" }
+        Mock Get-DotEnvValue {
+            param($dotEnvFilePath, $key)
+            if ($key -eq $SOLR_INDEX_LANGUAGES_KEY) { "en;nb" }
+            elseif ($key -eq $SOLR_JAVA_MEM_KEY) { "-Xms8g -Xmx8g" }
+            elseif ($key -eq $SOLR_JAVA_STACK_SIZE_KEY) { "-Xss256k" }
+        }
+        Mock Get-FormattedDirectorySize { "12.345 GB" }
+
+        $result = Get-SolrInfoReportSection "http://localhost/Dashboard/api" "C:\Saga\"
+
+        $result | Should -Match "Solr index languages.*en;nb"
+        $result | Should -Match "Solr java memory.*-Xms8g -Xmx8g"
+        $result | Should -Match "Solr java stack size.*-Xss256k"
+        $result | Should -Match "Solr index size.*12\.345 GB"
     }
 }
 
@@ -227,13 +260,17 @@ Describe "Get-AuthenticationMethodReportSection" {
 Describe "Get-SagaInfoReportSection" {
     BeforeEach {
         Mock Get-OperatingSystemVersion { "Windows Server 2022 Standard (10.0.20348, build 20348)" }
+        Mock Get-InstalledConnectorNames { @("fileserver", "exchange") }
+        Mock Get-InstalledConnectorNamesFromPluginsDirectory { @("fileserver") }
+        Mock Get-ConnectorNamesInUse { @("fileserver") }
+        Mock Get-RunningConnectorNames { " - fileserver" }
     }
 
     It "includes the install directory, Saga version, branding, and gateway hostname when all are available" {
         Mock Get-SagaVersion { "7.19.0" }
         Mock Get-DotEnvValue { "custom" }
 
-        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com"
+        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com" "http://localhost/api/connector-broker/v1"
 
         $result | Should -Match "SAGA INFO"
         $result | Should -Match "Install directory.*C:\\Saga\\"
@@ -247,20 +284,24 @@ Describe "Get-SagaInfoReportSection" {
         # and the case where Get-SagaGatewayCertificateInfo itself failed entirely.
         Mock Get-SagaVersion { throw "should not be called" }
         Mock Get-DotEnvValue { throw "should not be called" }
+        Mock Get-InstalledConnectorNames { throw "connection refused" }
+        Mock Get-RunningConnectorNames { throw "docker not available" }
 
-        $result = Get-SagaInfoReportSection "" ""
+        $result = Get-SagaInfoReportSection "" "" "http://localhost/api/connector-broker/v1"
 
         $result | Should -Match "Install directory.*Unavailable"
         $result | Should -Match "Saga version.*Unavailable"
         $result | Should -Match "Branding.*Unavailable"
         $result | Should -Match "Gateway hostname.*Unavailable"
+        $result | Should -Match "Installed connectors \(plugins directory\).*Unavailable"
+        $result | Should -Match "Installed connectors \(Management Console\).*Unavailable"
     }
 
     It "degrades the version and branding fields independently when the install directory is known but one lookup fails" {
         Mock Get-SagaVersion { throw "git.version not found" }
         Mock Get-DotEnvValue { "ayfie" }
 
-        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com"
+        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com" "http://localhost/api/connector-broker/v1"
 
         $result | Should -Match "Saga version.*Unavailable"
         $result | Should -Match "Branding.*ayfie"
@@ -270,7 +311,7 @@ Describe "Get-SagaInfoReportSection" {
         Mock Get-SagaVersion { "7.19.0" }
         Mock Get-DotEnvValue { "custom" }
 
-        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com"
+        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com" "http://localhost/api/connector-broker/v1"
 
         $result | Should -Match "OS supported by Saga.*Supported"
     }
@@ -280,7 +321,7 @@ Describe "Get-SagaInfoReportSection" {
         Mock Get-SagaVersion { "7.19.0" }
         Mock Get-DotEnvValue { "custom" }
 
-        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com"
+        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com" "http://localhost/api/connector-broker/v1"
 
         $result | Should -Match "OS supported by Saga.*WARNING.*not a version supported by Ayfie Index \(Saga\)"
     }
@@ -290,9 +331,22 @@ Describe "Get-SagaInfoReportSection" {
         Mock Get-SagaVersion { "7.19.0" }
         Mock Get-DotEnvValue { "custom" }
 
-        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com"
+        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com" "http://localhost/api/connector-broker/v1"
 
         $result | Should -Match "OS supported by Saga.*Unavailable"
+    }
+
+    It "includes the connector summary fields when everything succeeds" {
+        Mock Get-SagaVersion { "7.19.0" }
+        Mock Get-DotEnvValue { "custom" }
+
+        $result = Get-SagaInfoReportSection "C:\Saga\" "engine.example.com" "http://localhost/api/connector-broker/v1"
+
+        $result | Should -Match "Installed connectors \(Management Console\).*fileserver exchange"
+        $result | Should -Match "Installed connectors \(plugins directory\).*fileserver"
+        $result | Should -Match "Connectors in actual use.*fileserver"
+        $result | Should -Match "Running connector containers"
+        $result | Should -Match " - fileserver"
     }
 }
 
@@ -312,6 +366,112 @@ Describe "Get-DataSourceConnectionsReportSection" {
         $result = Get-DataSourceConnectionsReportSection "http://localhost/api/connector-broker/v1"
 
         $result | Should -Match "Unavailable"
+    }
+}
+
+Describe "Get-DataSourceUserSyncingReportSection" {
+    It "includes the AD/Azure AD syncing flag when the install directory is known" {
+        Mock Get-AdAndAzureAdSync { "true" }
+
+        $result = Get-DataSourceUserSyncingReportSection "C:\Saga\"
+
+        $result | Should -Match "DATA SOURCE USER SYNCING"
+        $result | Should -Match "AD and Azure AD syncing.*true"
+    }
+
+    It "reports 'Unavailable' when the install directory couldn't be resolved" {
+        Mock Get-AdAndAzureAdSync { throw "should not be called" }
+
+        $result = Get-DataSourceUserSyncingReportSection ""
+
+        $result | Should -Match "AD and Azure AD syncing.*Unavailable"
+    }
+}
+
+Describe "Get-DatabaseInfoReportSection" {
+    It "includes all five database fields when the install directory is known" {
+        Mock Get-DatabaseInfo {
+            [pscustomobject]@{ Type = "MSSQL"; Name = "Locator"; User = "postgres"; Server = "dbserver.example.com"; Port = "1433" }
+        }
+
+        $result = Get-DatabaseInfoReportSection "C:\Saga\"
+
+        $result | Should -Match "DATABASE INFO"
+        $result | Should -Match "Database type.*MSSQL"
+        $result | Should -Match "Database name.*Locator"
+        $result | Should -Match "Database user.*postgres"
+        $result | Should -Match "Database server.*dbserver\.example\.com"
+        $result | Should -Match "Database port.*1433"
+    }
+
+    It "reports every field as 'Unavailable' when the install directory couldn't be resolved" {
+        Mock Get-DatabaseInfo { throw "should not be called" }
+
+        $result = Get-DatabaseInfoReportSection ""
+
+        $result | Should -Match "Database type.*Unavailable"
+        $result | Should -Match "Database port.*Unavailable"
+    }
+
+    It "degrades gracefully to 'Unavailable' when the lookup itself fails" {
+        Mock Get-DatabaseInfo { throw "file not found" }
+
+        $result = Get-DatabaseInfoReportSection "C:\Saga\"
+
+        $result | Should -Match "Database type.*Unavailable"
+    }
+}
+
+Describe "Get-DockerImagesReportSection" {
+    It "includes the image list under a DOCKER IMAGES CURRENTLY IN USE heading" {
+        Mock Get-DockerImagesOfRunningContainers { "ayfiehub/locator:7.3.1`nayfiehub/solr:7.4.0" }
+
+        $result = Get-DockerImagesReportSection
+
+        $result | Should -Match "DOCKER IMAGES CURRENTLY IN USE"
+        $result | Should -Match "ayfiehub/locator:7\.3\.1"
+    }
+
+    It "degrades gracefully (no crash, 'Unavailable') when the docker call fails" {
+        Mock Get-DockerImagesOfRunningContainers { throw "docker not available" }
+
+        $result = Get-DockerImagesReportSection
+
+        $result | Should -Match "Unavailable"
+    }
+}
+
+Describe "Get-BackupsReportSection" {
+    It "includes count, latest backup, and total size when backups exist" {
+        Mock Get-BackupsSummary {
+            [pscustomobject]@{ Count = 2; LatestBackup = "2026-03-21 17:59"; TotalSize = "151.751 MB" }
+        }
+
+        $result = Get-BackupsReportSection "C:\Saga\"
+
+        $result | Should -Match "BACKUPS"
+        $result | Should -Match "Number of backups.*2"
+        $result | Should -Match "Latest backup.*2026-03-21 17:59"
+        $result | Should -Match "Total size.*151\.751 MB"
+    }
+
+    It "reports only the zero count, with no latest/size fields, when there are no backups" {
+        Mock Get-BackupsSummary {
+            [pscustomobject]@{ Count = 0; LatestBackup = $null; TotalSize = $null }
+        }
+
+        $result = Get-BackupsReportSection "C:\Saga\"
+
+        $result | Should -Match "Number of backups.*0"
+        $result | Should -Not -Match "Latest backup"
+    }
+
+    It "reports 'Unavailable' when the install directory couldn't be resolved" {
+        Mock Get-BackupsSummary { throw "should not be called" }
+
+        $result = Get-BackupsReportSection ""
+
+        $result | Should -Match "Number of backups.*Unavailable"
     }
 }
 

@@ -8,10 +8,12 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.15.0). The current release covers the rule engine,
-> custom refiners, the Solr document count, the scheduled restart task, an outbound firewall
-> connectivity check, the Saga gateway certificate, the authentication method, basic installation
-> info (install directory, Saga version, branding, gateway hostname, OS support status), the
+> **Status:** early, actively developed (v0.16.0). The current release covers the rule engine,
+> custom refiners, Solr info (document count, index languages/memory/stack size/index size), the
+> scheduled restart task, an outbound firewall connectivity check, the Saga gateway certificate,
+> the authentication method, AD/Azure AD data source syncing, database info, backups, Docker
+> images currently in use, an optional gMSA account check, installation info (install directory,
+> Saga version, branding, gateway hostname, OS support status, installed/in-use connectors), the
 > redacted `custom.env` file content, and the data source connections (with settings redacted).
 
 > **Independent, unofficial project.** Not affiliated with, endorsed by, or sponsored by Ayfie
@@ -25,7 +27,10 @@ by hand.
   sort order, last-modified timestamp, and full rule definition.
 - **Custom refiners:** every search refiner that isn't part of the built-in default set, with its
   field name, facet type, selection limit, enabled state, and sort order.
-- **Solr document count:** the current source reference count.
+- **Solr info:** index languages, Java memory and stack size settings (from the running
+  installation's `.env`), the index's on-disk size (recursive scan of the Solr data directory,
+  formatted with an explicit invariant culture so the decimal separator doesn't depend on the
+  host's own locale), and the current source reference count.
 - **Scheduled restart task:** whether a scheduled restart task exists, and if so, its schedule,
   the command it runs, and the user it runs as.
 - **Outbound firewall openings:** which of the external endpoints an Ayfie Index installation
@@ -40,7 +45,20 @@ by hand.
   is, so this adds no extra Docker calls of its own. Also reports whether the host's OS is one
   Ayfie Index (Saga) is actually qualified to run on, as an informational warning rather than a
   blocker — unlike the internal tool this check is ported from, an unsupported OS here never
-  prevents the rest of the report from running.
+  prevents the rest of the report from running. Also reports installed connectors from two
+  independent sources (the Management Console API, and a scan of the install directory's `plugins`
+  folder), which connectors actually have at least one connection configured, and which connector
+  containers are currently running.
+- **Data source user syncing:** whether AD/Azure AD user syncing is enabled, from the running
+  installation's `.env`.
+- **Database info:** database type, name, user, server, and port, from the running installation's
+  `.env`.
+- **Backups:** number of backups found, the most recent backup's timestamp, and the total size on
+  disk of the backup directory.
+- **Docker images currently in use:** the image:tag of every currently running container.
+- **gMSA account check** (opt-in, needs `-gmsaAccountName`): passed straight through to Winspect's
+  own gMSA validation, adding a `GMSA ACCOUNT` section reporting the account name and whether it
+  validates successfully.
 - **Custom.env file content:** the `custom.env` overrides file, with values for any key matching a
   sensitive-naming convention (`PASSWORD`, `SECRET`, `API_KEY`, `API_TOKEN`) dropped entirely rather
   than shown or masked.
@@ -79,9 +97,10 @@ by hand.
 - Run elevated (as Administrator) to get real disk speed/latency numbers in the Winspect portion
   of the report.
 - Docker CLI access, to auto-discover the gateway certificate's file location and the configured
-  gateway hostname from the running installation's `.env`. Not needed if `-certificateFilePath` is
-  given explicitly instead (e.g. checking a host before Saga is installed, when there's no running
-  installation to discover from).
+  gateway hostname from the running installation's `.env`, and to list running containers/images
+  (Saga info's connector container check, Docker images currently in use). Not needed for the
+  certificate/install-dir discovery if `-certificateFilePath` is given explicitly instead (e.g.
+  checking a host before Saga is installed, when there's no running installation to discover from).
 - Outbound network access to the gateway hostname on port 443, for the live HTTPS certificate
   check. Not required - the check falls back to the certificate file if the endpoint can't be
   reached, and says so in the report.
@@ -103,6 +122,9 @@ by hand.
 
 # Check a host before Saga is installed there, using an explicit certificate path
 .\Invoke-AyfieInspector.ps1 -certificateFilePath "C:\path\to\gateway.crt"
+
+# Also validate a gMSA account
+.\Invoke-AyfieInspector.ps1 -gmsaAccountName "domain\sagagMSA$"
 ```
 
 | Parameter | Values | Default | Description |
@@ -114,6 +136,7 @@ by hand.
 | `-logLevel` | `trace`, `debug`, `info`, `warning`, `error`, `off` | `off` | Logging verbosity. |
 | `-skipFirewallCheck` | switch | off | Skip the outbound connectivity check (adds noticeable time otherwise). |
 | `-certificateFilePath` | path | auto-discovered | Path to the Saga gateway certificate file; only needed to override auto-discovery, e.g. when checking a host before Saga is installed. Setting this skips the live HTTPS check entirely (no gateway hostname is resolved). |
+| `-gmsaAccountName` | account name | none | Name of a gMSA to validate, passed straight through to Winspect. Adds a `GMSA ACCOUNT` section when supplied; omitted entirely otherwise. |
 | `-winspectPath` | path | auto-detected | Path to Winspect's entry script; only needed if it's not where AyfieInspector expects it. |
 
 ## Sample output
@@ -133,12 +156,26 @@ Alternate sites:
 ################## AUTHENTICATION METHOD ###################
 Authentication method: Entra ID
 
+################# DATA SOURCE USER SYNCING #################
+AD and Azure AD syncing: true
+
 ######################## SAGA INFO #########################
 Install directory: d:\program files\ayfie\saga\
 Saga version: 7.19.0
 Branding: ayfie
 Gateway hostname: engine.example.com
 OS supported by Saga: Supported
+Installed connectors (Management Console): fileserver exchange sharepoint
+Installed connectors (plugins directory): fileserver exchange
+Connectors in actual use: fileserver exchange
+Running connector containers: 
+ - fileserver
+ - exchange
+
+######################### BACKUPS ##########################
+Number of backups: 2
+Latest backup: 2026-03-21 17:59
+Total size: 151.751 MB
 
 ################# CUSTOM.ENV FILE CONTENT ##################
 AYFIE_SAGA_BRANDING_KEY=ayfie
@@ -150,7 +187,18 @@ Task execution time: Every Sunday at 03:00
 Task command: .\stop-saga.ps1 .\saga.ps1 -Quiet -AcceptEula
 Task user: ayfie
 
+###################### DATABASE INFO #######################
+Database type: MSSQL
+Database name: Locator
+Database user: postgres
+Database server: dbserver.example.com
+Database port: 1433
+
 ######################## SOLR INFO #########################
+Solr index languages: en;nb
+Solr java memory: -Xms8g -Xmx8g
+Solr java stack size: -Xss256k
+Solr index size: 72.437 GB
 Source reference count: 842,315
 
 ##################### CUSTOM REFINERS ######################
@@ -162,6 +210,11 @@ Refiners:
         SelectionLimit: 1000
         Enabled: True
         SortOrder: 5
+
+############## DOCKER IMAGES CURRENTLY IN USE ##############
+ayfiehub/locator:7.19.0
+ayfiehub/solr:7.4.0
+ayfiehub/gateway-keycloak:6.1.0
 
 ################# DATA SOURCE CONNECTIONS ##################
 NetData (fileserver)
@@ -236,7 +289,14 @@ src/
   FirewallInfo.ps1               outbound connectivity check
   SagaCertificateInfo.ps1        Saga gateway certificate path - auto-discovery and override
   AuthenticationInfo.ps1         identity provider / user federation provider counts from Keycloak
-  SagaInfo.ps1                   Saga version from git.version
+  SagaInfo.ps1                   Saga version, OS support check, installed connectors (API + plugins dir), connectors in use
+  EnvFileInfo.ps1                custom.env file content, redacted
+  ConnectorApi.ps1               connector-broker API wrapper (installed connectors, connections, settings)
+  DataSourceConnectionInfo.ps1   data source connections summary, settings redacted
+  DatabaseInfo.ps1               database type/name/user/server/port, AD/Azure AD sync flag
+  DirectorySizeInfo.ps1          recursive directory size scan, invariant-culture formatted
+  DockerInfo.ps1                 running containers/images, running connector containers
+  BackupInfo.ps1                 backup count, latest backup, total size
   MainOrchestration.ps1          builds each report section and assembles the combined report
 ```
 

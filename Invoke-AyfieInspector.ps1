@@ -45,6 +45,11 @@ Root URL of the connector-broker API that the data source connections section is
 Defaults to "http://localhost/api/connector-broker/v1" - like dashboardApiRootUrl, this must run on
 the Saga/Ayfie Index host itself.
 
+.PARAMETER gmsaAccountName
+Name of a gMSA (group Managed Service Account) to validate, passed straight through to Winspect's
+own -gmsaAccountName parameter. Adds a GMSA ACCOUNT section to the report when supplied; omitted
+entirely otherwise.
+
 .PARAMETER logLevel
 Sets the log level to trace, debug, info, warning or error. Off (no logging) is the default. Passed
 through to Winspect as well, so one flag controls both halves. Writes two separate log files (one
@@ -98,7 +103,9 @@ param(
 
     [switch]$skipFirewallCheck,
 
-    [string]$certificateFilePath = ""
+    [string]$certificateFilePath = "",
+
+    [string]$gmsaAccountName = ""
 )
 
 if (-not (Test-Path $winspectPath)) {
@@ -132,6 +139,10 @@ $SCRIPT_PATH = $PSCommandPath
 . (Join-Path $SRC_DIR "EnvFileInfo.ps1")
 . (Join-Path $SRC_DIR "ConnectorApi.ps1")
 . (Join-Path $SRC_DIR "DataSourceConnectionInfo.ps1")
+. (Join-Path $SRC_DIR "DatabaseInfo.ps1")
+. (Join-Path $SRC_DIR "DirectorySizeInfo.ps1")
+. (Join-Path $SRC_DIR "DockerInfo.ps1")
+. (Join-Path $SRC_DIR "BackupInfo.ps1")
 . (Join-Path $SRC_DIR "MainOrchestration.ps1")
 
 Start-AyfieInspector

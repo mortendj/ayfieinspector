@@ -45,23 +45,46 @@ function Get-CustomRefinersReportSection($dashboardApiRootUrl) {
     return New-SectionOutput "CUSTOM REFINERS" $lineScriptBlocks
 }
 
-function Get-SolrInfoReportSection($dashboardApiRootUrl) {
+function Get-SolrInfoReportSection($dashboardApiRootUrl, $installDirPath) {
     $sourceReferenceCount = "Unavailable"
     try {
         $sourceReferenceCount = Get-SourceReferenceCount $dashboardApiRootUrl
     } catch {
         Write-Warning "Failed to retrieve source reference count from '$dashboardApiRootUrl/sourcereference/count': $_"
     }
-    # A single plain (unclosed) scriptblock, not GetNewClosure() - this isn't in a loop, so there's
-    # no stale-variable risk to guard against, and a plain scriptblock correctly resolves both
-    # $FIELD_LABEL_SEPARATOR (an ancestor script-scope variable) and $sourceReferenceCount (local
-    # to this still-active function) via normal dynamic scope resolution, matching Winspect's own
-    # single-value line convention (e.g. "CPU cores$FIELD_LABEL_SEPARATOR$(...)").
-    # GetNewClosure() would have been wrong here for a different reason than the loop case: it only
-    # snapshots variables truly local to the enclosing scope, so combined with $FIELD_LABEL_SEPARATOR
-    # in the same block it silently resolved that one to empty (confirmed locally: rendered
-    # "Source reference countUnavailable" with the separator missing).
+    $solrIndexLanguages = "Unavailable"
+    $solrJavaMemory = "Unavailable"
+    $solrJavaStackSize = "Unavailable"
+    $solrIndexSize = "Unavailable"
+    if ($installDirPath -ne "") {
+        try {
+            $dotEnvFilePath = Join-Path $installDirPath $DOT_ENV_RELATIVE_PATH
+            $solrIndexLanguages = Get-DotEnvValue $dotEnvFilePath $SOLR_INDEX_LANGUAGES_KEY
+            $solrJavaMemory = Get-DotEnvValue $dotEnvFilePath $SOLR_JAVA_MEM_KEY
+            $solrJavaStackSize = Get-DotEnvValue $dotEnvFilePath $SOLR_JAVA_STACK_SIZE_KEY
+        } catch {
+            Write-Warning "Failed to read Solr .env settings: $_"
+        }
+        try {
+            $solrIndexSize = Get-FormattedDirectorySize (Join-Path $installDirPath $SOLR_INDEX_RELATIVE_PATH)
+        } catch {
+            Write-Warning "Failed to determine the Solr index size: $_"
+        }
+    }
+    # Plain (unclosed) scriptblocks, not GetNewClosure() - this isn't in a loop, so there's no
+    # stale-variable risk to guard against, and a plain scriptblock correctly resolves both
+    # $FIELD_LABEL_SEPARATOR (an ancestor script-scope variable) and each local variable via normal
+    # dynamic scope resolution, matching Winspect's own single-value line convention (e.g. "CPU
+    # cores$FIELD_LABEL_SEPARATOR$(...)"). GetNewClosure() would have been wrong here for a
+    # different reason than the loop case: it only snapshots variables truly local to the enclosing
+    # scope, so combined with $FIELD_LABEL_SEPARATOR in the same block it silently resolved that one
+    # to empty (confirmed locally: rendered "Source reference countUnavailable" with the separator
+    # missing).
     $lineScriptBlocks = @(
+        { "Solr index languages$FIELD_LABEL_SEPARATOR$solrIndexLanguages" },
+        { "Solr java memory$FIELD_LABEL_SEPARATOR$solrJavaMemory" },
+        { "Solr java stack size$FIELD_LABEL_SEPARATOR$solrJavaStackSize" },
+        { "Solr index size$FIELD_LABEL_SEPARATOR$solrIndexSize" },
         { "Source reference count$FIELD_LABEL_SEPARATOR$sourceReferenceCount" }
     )
     return New-SectionOutput "SOLR INFO" $lineScriptBlocks
@@ -110,7 +133,7 @@ function Get-FirewallOpeningsReportSection() {
     return New-SectionOutput "FIREWALL OPENINGS" $lineScriptBlocks
 }
 
-function Get-SagaInfoReportSection($installDirPath, $gatewayHostname) {
+function Get-SagaInfoReportSection($installDirPath, $gatewayHostname, $connectorApiRootUrl) {
     # Reuses installDirPath/gatewayHostname already resolved once for the gateway certificate
     # check (see Get-SagaGatewayCertificateInfo) rather than re-discovering them here - both are
     # simply "Unavailable" when that resolution failed or was skipped (the pre-installation
@@ -120,6 +143,10 @@ function Get-SagaInfoReportSection($installDirPath, $gatewayHostname) {
     $branding = "Unavailable"
     $gatewayHostnameDisplay = "Unavailable"
     $osSupportSummary = "Unavailable"
+    $installedConnectorsFromPlugins = "Unavailable"
+    $installedConnectorsFromApi = "Unavailable"
+    $connectorsInUse = "Unavailable"
+    $runningConnectorContainers = "Unavailable"
 
     if ($installDirPath -ne "") {
         $installDirDisplay = $installDirPath
@@ -134,6 +161,11 @@ function Get-SagaInfoReportSection($installDirPath, $gatewayHostname) {
         } catch {
             Write-Warning "Failed to determine the Saga branding: $_"
         }
+        try {
+            $installedConnectorsFromPlugins = (Get-InstalledConnectorNamesFromPluginsDirectory $installDirPath) -join " "
+        } catch {
+            Write-Warning "Failed to list installed connectors from the plugins directory: $_"
+        }
     }
     if ($gatewayHostname -ne "") {
         $gatewayHostnameDisplay = $gatewayHostname
@@ -143,6 +175,18 @@ function Get-SagaInfoReportSection($installDirPath, $gatewayHostname) {
     } catch {
         Write-Warning "Failed to determine OS support status: $_"
     }
+    try {
+        $apiConnectorNames = Get-InstalledConnectorNames $connectorApiRootUrl
+        $installedConnectorsFromApi = $apiConnectorNames -join " "
+        $connectorsInUse = (Get-ConnectorNamesInUse $connectorApiRootUrl $apiConnectorNames) -join " "
+    } catch {
+        Write-Warning "Failed to list installed connectors from '$connectorApiRootUrl': $_"
+    }
+    try {
+        $runningConnectorContainers = Get-RunningConnectorNames
+    } catch {
+        Write-Warning "Failed to list running connector containers: $_"
+    }
 
     # Plain (unclosed) scriptblocks - see the SOLR INFO note above for why GetNewClosure() would be
     # wrong, not just unnecessary, here.
@@ -151,9 +195,92 @@ function Get-SagaInfoReportSection($installDirPath, $gatewayHostname) {
         { "Saga version$FIELD_LABEL_SEPARATOR$sagaVersion" },
         { "Branding$FIELD_LABEL_SEPARATOR$branding" },
         { "Gateway hostname$FIELD_LABEL_SEPARATOR$gatewayHostnameDisplay" },
-        { "OS supported by Saga$FIELD_LABEL_SEPARATOR$osSupportSummary" }
+        { "OS supported by Saga$FIELD_LABEL_SEPARATOR$osSupportSummary" },
+        { "Installed connectors (Management Console)$FIELD_LABEL_SEPARATOR$installedConnectorsFromApi" },
+        { "Installed connectors (plugins directory)$FIELD_LABEL_SEPARATOR$installedConnectorsFromPlugins" },
+        { "Connectors in actual use$FIELD_LABEL_SEPARATOR$connectorsInUse" },
+        { "Running connector containers$FIELD_LABEL_SEPARATOR" },
+        { "$runningConnectorContainers" }
     )
     return New-SectionOutput "SAGA INFO" $lineScriptBlocks
+}
+
+function Get-DataSourceUserSyncingReportSection($installDirPath) {
+    $adAndAzureAdSync = "Unavailable"
+    if ($installDirPath -ne "") {
+        try {
+            $adAndAzureAdSync = Get-AdAndAzureAdSync $installDirPath
+        } catch {
+            Write-Warning "Failed to determine AD/Azure AD syncing status: $_"
+        }
+    }
+    # Plain (unclosed) scriptblock - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "AD and Azure AD syncing$FIELD_LABEL_SEPARATOR$adAndAzureAdSync" }
+    )
+    return New-SectionOutput "DATA SOURCE USER SYNCING" $lineScriptBlocks
+}
+
+function Get-DatabaseInfoReportSection($installDirPath) {
+    $databaseInfo = [pscustomobject]@{
+        Type = "Unavailable"; Name = "Unavailable"; User = "Unavailable"; Server = "Unavailable"; Port = "Unavailable"
+    }
+    if ($installDirPath -ne "") {
+        try {
+            $databaseInfo = Get-DatabaseInfo $installDirPath
+        } catch {
+            Write-Warning "Failed to determine database info: $_"
+        }
+    }
+    # Plain (unclosed) scriptblocks - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "Database type$FIELD_LABEL_SEPARATOR$($databaseInfo.Type)" },
+        { "Database name$FIELD_LABEL_SEPARATOR$($databaseInfo.Name)" },
+        { "Database user$FIELD_LABEL_SEPARATOR$($databaseInfo.User)" },
+        { "Database server$FIELD_LABEL_SEPARATOR$($databaseInfo.Server)" },
+        { "Database port$FIELD_LABEL_SEPARATOR$($databaseInfo.Port)" }
+    )
+    return New-SectionOutput "DATABASE INFO" $lineScriptBlocks
+}
+
+function Get-DockerImagesReportSection() {
+    $dockerImages = "Unavailable"
+    try {
+        $dockerImages = Get-DockerImagesOfRunningContainers
+    } catch {
+        Write-Warning "Failed to list Docker images of running containers: $_"
+    }
+    # Plain (unclosed) scriptblock - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "$dockerImages" }
+    )
+    return New-SectionOutput "DOCKER IMAGES CURRENTLY IN USE" $lineScriptBlocks
+}
+
+function Get-BackupsReportSection($installDirPath) {
+    $backupsSummary = [pscustomobject]@{ Count = "Unavailable"; LatestBackup = $null; TotalSize = $null }
+    if ($installDirPath -ne "") {
+        try {
+            $backupsSummary = Get-BackupsSummary $installDirPath
+        } catch {
+            Write-Warning "Failed to determine backup info: $_"
+        }
+    }
+    # Plain (unclosed) scriptblocks - see the SOLR INFO note above for why GetNewClosure() would be
+    # wrong, not just unnecessary, here.
+    $lineScriptBlocks = @(
+        { "Number of backups$FIELD_LABEL_SEPARATOR$($backupsSummary.Count)" }
+    )
+    if ($backupsSummary.Count -is [int] -and $backupsSummary.Count -gt 0) {
+        $lineScriptBlocks += @(
+            { "Latest backup$FIELD_LABEL_SEPARATOR$($backupsSummary.LatestBackup)" },
+            { "Total size$FIELD_LABEL_SEPARATOR$($backupsSummary.TotalSize)" }
+        )
+    }
+    return New-SectionOutput "BACKUPS" $lineScriptBlocks
 }
 
 function Get-CustomEnvFileReportSection($installDirPath) {
@@ -267,7 +394,7 @@ function Start-AyfieInspector() {
     }
 
     Write-Host "Running Winspect ($winspectPath) for generic host facts..."
-    $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel -certificateFilePath $resolvedCertificateFilePath -certificateHostname $resolvedCertificateHostname -certificateSectionLabel "SAGA CERTIFICATE"
+    $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel -certificateFilePath $resolvedCertificateFilePath -certificateHostname $resolvedCertificateHostname -certificateSectionLabel "SAGA CERTIFICATE" -gmsaAccountName $gmsaAccountName
     $winspectReportText = $winspectReportLines -join $PHYSICAL_NEWLINE
     $winspectReportText = Add-AyfieInspectorVersionToReportInfo $winspectReportText
 
@@ -302,7 +429,13 @@ function Start-AyfieInspector() {
     Write-Host "Determining the authentication method..."
     $newSectionsRaw += Get-AuthenticationMethodReportSection
 
-    $newSectionsRaw += Get-SagaInfoReportSection $resolvedInstallDirPath $resolvedCertificateHostname
+    $newSectionsRaw += Get-DataSourceUserSyncingReportSection $resolvedInstallDirPath
+
+    Write-Host "Querying data source connections at $connectorApiRootUrl for the SAGA INFO connector summary..."
+    $newSectionsRaw += Get-SagaInfoReportSection $resolvedInstallDirPath $resolvedCertificateHostname $connectorApiRootUrl
+
+    Write-Host "Checking backups..."
+    $newSectionsRaw += Get-BackupsReportSection $resolvedInstallDirPath
 
     Write-Host "Reading custom.env file content..."
     $newSectionsRaw += Get-CustomEnvFileReportSection $resolvedInstallDirPath
@@ -310,11 +443,16 @@ function Start-AyfieInspector() {
     Write-Host "Checking the scheduled restart task ..."
     $newSectionsRaw += Get-ScheduledRestartReportSection
 
+    $newSectionsRaw += Get-DatabaseInfoReportSection $resolvedInstallDirPath
+
     Write-Host "Querying source reference count at $dashboardApiRootUrl/sourcereference/count ..."
-    $newSectionsRaw += Get-SolrInfoReportSection $dashboardApiRootUrl
+    $newSectionsRaw += Get-SolrInfoReportSection $dashboardApiRootUrl $resolvedInstallDirPath
 
     Write-Host "Querying custom refiners at $dashboardApiRootUrl/refiners ..."
     $newSectionsRaw += Get-CustomRefinersReportSection $dashboardApiRootUrl
+
+    Write-Host "Listing Docker images of running containers..."
+    $newSectionsRaw += Get-DockerImagesReportSection
 
     Write-Host "Querying data source connections at $connectorApiRootUrl ..."
     $newSectionsRaw += Get-DataSourceConnectionsReportSection $connectorApiRootUrl

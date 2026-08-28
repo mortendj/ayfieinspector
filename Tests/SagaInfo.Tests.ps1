@@ -5,6 +5,7 @@ BeforeAll {
     . "$PSScriptRoot/../../Winspect/src/Logging.ps1"
     . "$PSScriptRoot/../../Winspect/src/Utilities.ps1"
     . "$PSScriptRoot/../src/Constants.ps1"
+    . "$PSScriptRoot/../src/ConnectorApi.ps1"
     . "$PSScriptRoot/../src/SagaInfo.ps1"
 }
 
@@ -39,5 +40,45 @@ Describe "Get-OsSupportSummary" {
 
         $result | Should -Match "^WARNING"
         $result | Should -Match "not a version supported by Ayfie Index \(Saga\)"
+    }
+}
+
+Describe "Get-InstalledConnectorNamesFromPluginsDirectory" {
+    It "strips the connector- prefix from each matching plugin directory name" {
+        $installDirPath = Join-Path $TestDrive "saga-install-plugins"
+        $pluginsDirPath = Join-Path $installDirPath "plugins"
+        New-Item -ItemType Directory -Path (Join-Path $pluginsDirPath "connector-fileserver") -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $pluginsDirPath "connector-exchange") -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $pluginsDirPath "not-a-connector") -Force | Out-Null
+
+        # Not `@(Get-InstalledConnectorNamesFromPluginsDirectory ...)` - see
+        # feedback_write_returnvalue_array_wrapping.md; the function already wraps its own result
+        # in @() before Write-ReturnValue, so wrapping the call here would nest it one level deeper.
+        $result = Get-InstalledConnectorNamesFromPluginsDirectory $installDirPath
+
+        $result | Should -Contain "fileserver"
+        $result | Should -Contain "exchange"
+        $result | Should -Not -Contain "not-a-connector"
+    }
+
+    It "returns an empty array, not an error, when the plugins directory doesn't exist" {
+        $installDirPath = Join-Path $TestDrive "saga-install-no-plugins"
+
+        (Get-InstalledConnectorNamesFromPluginsDirectory $installDirPath).Count | Should -Be 0
+    }
+}
+
+Describe "Get-ConnectorNamesInUse" {
+    It "keeps only connector names that have at least one connection" {
+        Mock Get-ConnectorConnections {
+            param($connectorApiRootUrl, $connectorName)
+            if ($connectorName -eq "fileserver") { @([pscustomobject]@{ id = 1 }) } else { @() }
+        }
+
+        # Not `@(Get-ConnectorNamesInUse ...)` - see feedback_write_returnvalue_array_wrapping.md.
+        $result = Get-ConnectorNamesInUse "http://localhost/api/connector-broker/v1" @("fileserver", "exchange")
+
+        $result.Count | Should -Be 1
+        $result[0] | Should -Be "fileserver"
     }
 }

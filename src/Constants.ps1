@@ -3,7 +3,7 @@
 # Named distinctly from Winspect's own $SCRIPT_VERSION/$SCRIPT_NAME (Constants.ps1) - Invoke-
 # AyfieInspector.ps1 dot-sources Winspect's Constants.ps1 too, and those names are already claimed
 # there.
-$AYFIE_INSPECTOR_VERSION           = "0.15.0"
+$AYFIE_INSPECTOR_VERSION           = "0.16.0"
 $AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-28"
 $AYFIE_INSPECTOR_NAME              = "AyfieInspector"
 $AYFIE_INSPECTOR_VERSION_STRING    = "$AYFIE_INSPECTOR_NAME v. $AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
@@ -81,6 +81,38 @@ $SENSITIVE_ENV_TOKENS     = @("PASSWORD", "SECRET", "API_KEY", "API_TOKEN")
 # discover its own settings redaction missed a connector's AuthKey field - see
 # project_ayfieinspector_gateway_cert_feature.md for that writeup).
 $SENSITIVE_CONN_TOKENS = @("Token", "Secret", "Password", "CompanyGuid", "Key")
+
+################## DATABASE INFO ##################
+
+$DATABASE_TYPE_KEY   = "AYFIE_SAGA_DATABASE_TYPE"
+$DATABASE_NAME_KEY   = "AYFIE_SAGA_DATABASE_NAME"
+$DATABASE_USER_KEY   = "AYFIE_SAGA_DATABASE_USER_NAME"
+$DATABASE_SERVER_KEY = "AYFIE_SAGA_DATABASE_SERVER"
+$DATABASE_PORT_KEY   = "AYFIE_SAGA_DATABASE_PORT"
+
+################## DATA SOURCE USER SYNCING ##################
+
+$AD_AAD_SYNC_KEY = "AYFIE_SAGA_AD_AAD_SYNC"
+
+################## SOLR INFO ##################
+
+$SOLR_INDEX_LANGUAGES_KEY = "AYFIE_SAGA_INDEX_LANGUAGES"
+$SOLR_JAVA_MEM_KEY        = "SOLR_JAVA_MEM"
+$SOLR_JAVA_STACK_SIZE_KEY = "SOLR_JAVA_STACK_SIZE"
+$SOLR_INDEX_RELATIVE_PATH = "data/solr"
+
+################## BACKUPS ##################
+
+$BACKUP_RELATIVE_PATH = "backup/data"
+
+################## DOCKER ##################
+
+$CONNECTOR_CONTAINER_NAME_PATTERN = "ayfie-connector-(\w+)"
+
+################## CONNECTORS ##################
+
+$CONNECTOR_PLUGINS_RELATIVE_PATH = "plugins"
+$CONNECTOR_PLUGIN_PREFIX         = "connector-"
 
 ################## SCHEDULED RESTART ##################
 

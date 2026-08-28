@@ -20,3 +20,27 @@ function Get-OsSupportSummary($operatingSystemVersion) {
         Write-ReturnValue "WARNING: '$operatingSystemVersion' is not a version supported by Ayfie Index (Saga)"
     }
 }
+
+function Get-InstalledConnectorNamesFromPluginsDirectory($installDirPath) {
+    Write-FunctionCallLog $PSBoundParameters
+    $pluginsDirPath = Join-Path $installDirPath $CONNECTOR_PLUGINS_RELATIVE_PATH
+    if (-not (Test-Path $pluginsDirPath)) {
+        Write-ReturnValue @()
+        return
+    }
+    $pluginDirectories = @(Get-ChildItem -Path $pluginsDirPath -Directory -Filter "$CONNECTOR_PLUGIN_PREFIX*" -ErrorAction SilentlyContinue)
+    $connectorNames = @($pluginDirectories | ForEach-Object { $_.Name -replace [regex]::Escape($CONNECTOR_PLUGIN_PREFIX), '' })
+    Write-ReturnValue $connectorNames
+}
+
+function Get-ConnectorNamesInUse($connectorApiRootUrl, $connectorNames) {
+    Write-FunctionCallLog $PSBoundParameters
+    $connectorNamesInUse = @()
+    foreach ($connectorName in $connectorNames) {
+        $connections = Get-ConnectorConnections $connectorApiRootUrl $connectorName
+        if (@($connections).Count -gt 0) {
+            $connectorNamesInUse += $connectorName
+        }
+    }
+    Write-ReturnValue $connectorNamesInUse
+}
