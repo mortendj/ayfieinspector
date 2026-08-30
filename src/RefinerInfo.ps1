@@ -18,12 +18,23 @@ function Get-RefinersSummary($refiners) {
         foreach ($refiner in $refiners) {
             $lines = @()
             $lines += "$INDENTATION$($refiner.DisplayName)"
-            $lines += "$INDENTATION${INDENTATION}RefinerName$FIELD_LABEL_SEPARATOR$($refiner.RefinerName)"
-            $lines += "$INDENTATION${INDENTATION}FieldName$FIELD_LABEL_SEPARATOR$($refiner.FieldName)"
-            $lines += "$INDENTATION${INDENTATION}FacetType$FIELD_LABEL_SEPARATOR$($refiner.FacetType)"
-            $lines += "$INDENTATION${INDENTATION}SelectionLimit$FIELD_LABEL_SEPARATOR$($refiner.SelectionLimit)"
-            $lines += "$INDENTATION${INDENTATION}Enabled$FIELD_LABEL_SEPARATOR$($refiner.Enabled)"
-            $lines += "$INDENTATION${INDENTATION}SortOrder$FIELD_LABEL_SEPARATOR$($refiner.SortOrder)"
+            # Every property the Dashboard API returns, not a hand-picked subset - matches
+            # ConfigInspector's own CUSTOM REFINERS section (a generic per-property dump via
+            # Get-ItemAsString), which showed ~20 fields (ParentRefiner, IsHierarchical, Tags,
+            # FacetsSortOrder, RangeType, etc.) this used to drop silently. Property order follows
+            # whatever order the API/JSON returned them in, same as ConfigInspector.
+            foreach ($property in $refiner.psobject.Properties) {
+                if ($property.Name -eq "DisplayName") {
+                    continue
+                }
+                $value = $property.Value
+                if ($null -eq $value) {
+                    $value = '$null'
+                } elseif ($value -is [System.Array]) {
+                    $value = $value -join ", "
+                }
+                $lines += "$INDENTATION${INDENTATION}$($property.Name)$FIELD_LABEL_SEPARATOR$value"
+            }
             $blocks += ($lines -join $LOGICAL_NEWLINE)
         }
         $output = ($blocks -join ($LOGICAL_NEWLINE + $LOGICAL_NEWLINE))

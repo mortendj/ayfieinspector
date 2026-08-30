@@ -82,6 +82,28 @@ Describe "Get-RefinersSummary" {
         $result | Should -Match "Enabled$([regex]::Escape($FIELD_LABEL_SEPARATOR))False"
     }
 
+    It "includes every property the API returned, not just the hand-picked original subset" {
+        # Regression test: this used to hardcode 6 fields, silently dropping everything else the
+        # Dashboard API returns (ParentRefiner, IsHierarchical, Tags, FacetsSortOrder, RangeType,
+        # etc.) - confirmed missing versus ConfigInspector's own generic per-property dump during a
+        # real KTH comparison.
+        $refiner = [pscustomobject]@{
+            RefinerName    = "School"
+            DisplayName    = "School"
+            FieldName      = "via_ssimd_kth_school"
+            ParentRefiner  = $null
+            IsHierarchical = $false
+            Tags           = @("KTH_SYSTEM_TAG", "OTHER_TAG")
+        }
+
+        $result = Get-RefinersSummary @($refiner)
+
+        $result | Should -Match "ParentRefiner$([regex]::Escape($FIELD_LABEL_SEPARATOR))\`$null"
+        $result | Should -Match "IsHierarchical$([regex]::Escape($FIELD_LABEL_SEPARATOR))False"
+        $result | Should -Match "Tags$([regex]::Escape($FIELD_LABEL_SEPARATOR))KTH_SYSTEM_TAG, OTHER_TAG"
+        $result | Should -Not -Match "DisplayName$([regex]::Escape($FIELD_LABEL_SEPARATOR))"
+    }
+
     It "includes every refiner when given more than one" {
         $refiners = @(
             (New-FakeRefiner "Department" "Department" "via_ssimd_department"),
