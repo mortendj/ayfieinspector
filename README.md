@@ -8,23 +8,25 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** early, actively developed (v0.22.0). The current release covers the rule engine,
+> **Status:** v1.0.1. The current release covers the rule engine,
 > custom refiners, Solr info (document count, index languages/memory/stack size/index size), the
-> scheduled restart task, an outbound firewall connectivity check, the Saga gateway certificate,
-> the authentication method, AD/Azure AD data source syncing, database info, backups, Docker
-> images currently in use, an optional gMSA account check, installation info (install directory,
-> Saga version, branding, gateway hostname, OS support status, installed/in-use connectors), Saga
-> license info (customer ID, activation/expiration dates, user/document capacity, licensed
-> features), the redacted `custom.env` file content, the data source connections (with settings
-> redacted, plus any other fields the connection API happens to return, e.g. repositories/security),
-> Supervisor info (report engine container status, license, Lingo configuration),
-> Personal Assistant info (operational mode and, on Saga versions before the models were dropped
-> from `docker/.env`, the configured chat models), Lingo info (enabled state, container status,
-> licenses, language/data type, and thread/recycle settings), and a diff of the running
-> `docker/.env` against its as-shipped reference (removed/added/modified variables, excluding
-> anything accounted for by `custom.env`), the raw database connector configuration definitions
-> for every connector that has one, and detailed SSL certificate info (issuing authority, subject
-> alternative names, private key encryption status).
+> scheduled restart task, an outbound firewall connectivity check, the Saga gateway/SSL certificate
+> (live-vs-file issuer comparison plus authority/expiration/SANs/private-key detail, all in one
+> section), the authentication method (identity provider/user federation, plus a local-account and
+> per-connector security-source check when neither is configured), AD/Azure AD data source syncing,
+> database info, backups, Docker images currently in use, an optional gMSA account check,
+> installation info (install directory, Saga version, branding, gateway hostname, OS support
+> status, installed/in-use connectors), Saga license info (customer ID, activation/expiration
+> dates, user/document capacity, licensed features), expirations and capacity depletions (days left
+> of the Saga license and the SSL certificate), the redacted `custom.env` file content, the data
+> source connections (with settings redacted, plus any other fields the connection API happens to
+> return, e.g. repositories/security), Supervisor info (report engine container status, license,
+> Lingo configuration), Personal Assistant info (operational mode and, on Saga versions before the
+> models were dropped from `docker/.env`, the configured chat models), Lingo info (enabled state,
+> container status, licenses, language/data type, and thread/recycle settings), a diff of the
+> running `docker/.env` against its as-shipped reference (removed/added/modified variables,
+> excluding anything accounted for by `custom.env`), and the raw database connector configuration
+> definitions for every connector that has one.
 
 > **Independent, unofficial project.** Not affiliated with, endorsed by, or sponsored by Ayfie
 > Group. "Ayfie", "Ayfie Index", and "Ayfie Locator" are trademarks of their respective owner.
@@ -49,7 +51,13 @@ by hand.
 - **Authentication method:** whether this installation is set up for Entra ID (identity provider)
   or Active Directory (user federation), queried directly from Keycloak's own database. Reports a
   clean "Not configured" for a genuinely unconfigured deployment — a legitimate, common state
-  during setup, confirmed on real customer hosts — rather than treating it as an error.
+  during setup, confirmed on real customer hosts — rather than treating it as an error. When
+  neither is configured, also reports how many non-admin local Keycloak accounts exist (the
+  built-in `saga_admin` console-admin account is never counted, since it isn't used for
+  application access) and whether any connector's `SecuritySources` restrict access to specific
+  Windows SIDs rather than everyone (`S-1-1-0`) — together, a concrete answer to "is document
+  access actually restricted to anyone in particular" instead of just flagging the absence of the
+  two supported mechanisms.
 - **Saga info:** install directory, Saga version, branding, and the configured gateway hostname —
   auto-discovered from the running installation the same way the gateway certificate check already
   is, so this adds no extra Docker calls of its own. Also reports whether the host's OS is one
@@ -91,9 +99,10 @@ by hand.
   section (as `Customer`, right after the section header) whenever it's known - simply omitted, not
   shown as "Unavailable", when it isn't (e.g. checking a host before Saga is installed).
 - **Expirations and capacity depletions:** days left until the Saga license expires (`Perpetual` for
-  a perpetual license, `No valid license` when there's genuinely none). Deliberately doesn't
-  duplicate the SSL certificate's own days-remaining figure, which is already shown in the `SAGA
-  CERTIFICATE` section.
+  a perpetual license, `No valid license` when there's genuinely none) and days left until the SSL
+  certificate expires. Spliced directly into Winspect's own report as the 2nd section overall
+  (right after `REPORT INFO`), matching where the equivalent information is surfaced elsewhere, so
+  it isn't buried at the end behind everything else.
 - **Custom.env file content:** the `custom.env` overrides file, with values for any key matching a
   sensitive-naming convention (`PASSWORD`, `SECRET`, `API_KEY`, `API_TOKEN`) dropped entirely rather
   than shown or masked.
@@ -118,22 +127,23 @@ by hand.
   contained a double quote) in the older tool this is ported from came from wrapping that same raw
   XML in a string and evaluating it as PowerShell source, which this project's plain scriptblock
   report sections never do in the first place.
-- **Saga gateway certificate:** identifies and reports the expiration of the actual Ayfie/Saga
-  gateway certificate — a file-backed certificate the generic Windows certificate store scan below
-  can never see. Checked both live over HTTPS against the configured gateway hostname (proof of
-  what's actually being served right now, auto-discovered from the running installation's `.env`)
-  and against the certificate file itself, with their issuers compared: a match reports one clean
-  line, a mismatch is flagged explicitly with both certificates shown side by side. The most common
-  real cause of a mismatch is a local TLS-inspecting security proxy silently re-signing outbound
-  HTTPS on the host - confirmed on a real customer host, where the live check alone would have
-  reported the proxy's substituted certificate as if it were genuine. Falls back to whichever check
-  succeeds if the other's endpoint/file isn't reachable (e.g. Saga is stopped). Can be pointed at
-  an explicit file instead (skipping the live check entirely) for checking a host before Saga is
-  even installed.
-- **SSL certificate info:** issuing certificate authority, subject alternative names, and the
-  private key's encryption status (`Encrypted`, `Unencrypted`, or - since it isn't easily
-  determined from the PEM header alone - a distinct "RSA key" case), read from the certificate file
-  itself (the private key only ever exists on disk, never over the live HTTPS check).
+- **Saga SSL certificate info:** identifies and reports on the actual Ayfie/Saga gateway
+  certificate — a file-backed certificate the generic Windows certificate store scan below can
+  never see. Checked both live over HTTPS against the configured gateway hostname (proof of what's
+  actually being served right now, auto-discovered from the running installation's `.env`) and
+  against the certificate file itself, with their issuers compared: a match reports one clean line,
+  a mismatch is flagged explicitly with both certificates shown side by side. The most common real
+  cause of a mismatch is a local TLS-inspecting security proxy silently re-signing outbound HTTPS
+  on the host - confirmed on a real customer host, where the live check alone would have reported
+  the proxy's substituted certificate as if it were genuine. Falls back to whichever check succeeds
+  if the other's endpoint/file isn't reachable (e.g. Saga is stopped). Can be pointed at an explicit
+  file instead (skipping the live check entirely) for checking a host before Saga is even
+  installed. The same section also shows the certificate's file name, issuing certificate
+  authority, expiration date, subject alternative names, and the private key's encryption status
+  (`Encrypted`, `Unencrypted`, or - since it isn't easily determined from the PEM header alone - a
+  distinct "RSA key" case), read from the certificate file itself (the private key only ever exists
+  on disk, never over the live HTTPS check) - one section for the certificate rather than two, since
+  both halves are about the exact same file.
 - **Generic host facts:** everything Winspect itself reports — host identity, network adapters,
   CPU/RAM/disk capacity and usage, and certificate expirations — included in the same combined
   report, with an `AyfieInspector version` line added next to Winspect's own version line so a
@@ -191,6 +201,8 @@ by hand.
 | `-connectorApiRootUrl` | URL | `http://localhost/api/connector-broker/v1` | Root URL for the data source connections check. |
 | `-logLevel` | `trace`, `debug`, `info`, `warning`, `error`, `off` | `off` | Logging verbosity. |
 | `-skipFirewallCheck` | switch | off | Skip the outbound connectivity check (adds noticeable time otherwise). |
+| `-monitoringPeriodMinutes` | number | `2` | Passed straight through to Winspect: minutes of CPU/memory samples to average over for RESOURCE USAGE. |
+| `-monitoringSamplingInSeconds` | int | `10` | Passed straight through to Winspect: seconds between each sample. Set to `0` to skip monitoring and fall back to a single instantaneous reading. |
 | `-certificateFilePath` | path | auto-discovered | Path to the Saga gateway certificate file; only needed to override auto-discovery, e.g. when checking a host before Saga is installed. Setting this skips the live HTTPS check entirely (no gateway hostname is resolved). |
 | `-gmsaAccountName` | account name | none | Name of a gMSA to validate, passed straight through to Winspect. Adds a `GMSA ACCOUNT` section when supplied; omitted entirely otherwise. |
 | `-winspectPath` | path | auto-detected | Path to Winspect's entry script; only needed if it's not where AyfieInspector expects it. |
@@ -198,14 +210,6 @@ by hand.
 ## Sample output
 
 ```
-################## SSL CERTIFICATE INFO #####################
-Certificate authority: CN=DigiCert Global CA, O=DigiCert Inc, C=US
-Subject alternative names: search.example.com
-Private key: Unencrypted
-
-########### EXPIRATIONS AND CAPACITY DEPLETIONS ############
-Days left of Saga license: 94
-
 #################### FIREWALL OPENINGS #####################
 Reachable sites:
     github.com
@@ -363,16 +367,20 @@ Rules:
     No rules found
 ```
 
-(The Winspect-generated sections — REPORT INFO (with an added `AyfieInspector version` line right
-alongside Winspect's own, and a `Customer` line right after the section header when the customer
-name is known), CERTIFICATES, SAGA CERTIFICATE (Winspect's generic "additional
-certificate" check, given AyfieInspector's own section title — hostname and file both resolved by
-AyfieInspector and passed through to Winspect, which checks the hostname live over HTTPS first and
-only falls back to the file if that's unreachable, always stating which one actually produced the
-result), HOST IDENTITY, NETWORK, SYSTEM RESOURCES, RESOURCE USAGE — appear first in the actual
-report; see
-[Winspect's own README](https://github.com/mortendj/winspect#sample-output) for what those look
-like.)
+(The Winspect-generated sections, plus two blocks AyfieInspector splices directly into Winspect's
+own report text rather than appending after it, come first in the actual report, in this order:
+REPORT INFO (with an added `AyfieInspector version` line right alongside Winspect's own, and a
+`Customer` line right after the section header when the customer name is known), EXPIRATIONS AND
+CAPACITY DEPLETIONS (AyfieInspector's own, spliced in as the 2nd block), CERTIFICATES, SAGA SSL
+CERTIFICATE INFO (Winspect's generic "additional certificate" check, given AyfieInspector's own
+section title — hostname and file both resolved by AyfieInspector and passed through to Winspect,
+which checks the hostname live over HTTPS first and only falls back to the file if that's
+unreachable, always stating which one actually produced the result; AyfieInspector then appends its
+own certificate file name/authority/expiration/SANs/private-key detail lines inside that same
+section, rather than showing a separate section for the same certificate), HOST IDENTITY, NETWORK,
+SYSTEM RESOURCES, RESOURCE USAGE — see
+[Winspect's own README](https://github.com/mortendj/winspect#sample-output) for what the
+Winspect-only sections look like on their own.)
 
 ## Building a release package
 
