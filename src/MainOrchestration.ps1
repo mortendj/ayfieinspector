@@ -239,17 +239,24 @@ function Get-SagaLicenseInfoReportSection($licenseSummary) {
     return New-SectionOutput "SAGA LICENSE INFO" $lineScriptBlocks
 }
 
-function Get-SslCertificateDetailReportSection($certificateFilePath) {
-    # Certificate authority/subject-alternative-names/private-key-encryption-status detail -
-    # deliberately its own section rather than folded into the SAGA CERTIFICATE section above it,
-    # since that one is Winspect's own generic certificate-store-vs-live-vs-file comparison and
-    # doesn't expose the underlying certificate object back to AyfieInspector for further field
-    # extraction. Reads from the certificate FILE specifically (not the live HTTPS endpoint) since
-    # the private key only ever exists on disk next to it.
+function Get-SslCertificateDetailLines($certificateFilePath) {
+    Write-FunctionCallLog $PSBoundParameters
+    # Resolves just the fields Winspect's own SAGA SSL CERTIFICATE INFO section can't show, since it
+    # never hands the resolved certificate object back to its caller - authority, expiration,
+    # subject alternative names, private key status. Deliberately merged into that same section
+    # (see Add-SslCertificateDetailToWinspectReport below) rather than kept as AyfieInspector's own
+    # separate section: both were about the exact same certificate, and a standalone AyfieInspector
+    # section used to duplicate Winspect's own live-vs-file issuer check, reporting it twice.
+    # Reads from the certificate FILE specifically (not the live HTTPS endpoint, which Winspect's
+    # own summary line already checks and reports on within the same merged section), since the
+    # private key only ever exists on disk next to it.
+    $certificateFileName = "Unavailable"
     $certificateAuthority = "Unavailable"
+    $expirationDate = "Unavailable"
     $subjectAlternativeNames = "Unavailable"
     $privateKeyStatus = "Unavailable"
     if ($certificateFilePath -ne "") {
+        $certificateFileName = Split-Path $certificateFilePath -Leaf
         $certificate = $null
         try {
             $certificate = Get-CertificateFromFile $certificateFilePath
@@ -262,6 +269,7 @@ function Get-SslCertificateDetailReportSection($certificateFilePath) {
             } catch {
                 Write-Warning "Failed to determine the certificate authority: $_"
             }
+            $expirationDate = $certificate.NotAfter.ToString("yyyy-MM-dd")
             try {
                 $subjectAlternativeNames = Get-CertificateSubjectAlternativeNames $certificate
             } catch {
@@ -274,32 +282,75 @@ function Get-SslCertificateDetailReportSection($certificateFilePath) {
             Write-Warning "Failed to determine the private key encryption status: $_"
         }
     }
-    # Plain (unclosed) scriptblocks - see the SOLR INFO note above for why GetNewClosure() would be
-    # wrong, not just unnecessary, here.
-    $lineScriptBlocks = @(
-        { "Certificate authority$FIELD_LABEL_SEPARATOR$certificateAuthority" },
-        { "Subject alternative names$FIELD_LABEL_SEPARATOR$subjectAlternativeNames" },
-        { "Private key$FIELD_LABEL_SEPARATOR$privateKeyStatus" }
+    Write-ReturnValue @(
+        "Certificate file$FIELD_LABEL_SEPARATOR$certificateFileName",
+        "Certificate authority$FIELD_LABEL_SEPARATOR$certificateAuthority",
+        "Expiration date$FIELD_LABEL_SEPARATOR$expirationDate",
+        "Subject alternative names$FIELD_LABEL_SEPARATOR$subjectAlternativeNames",
+        "Private key$FIELD_LABEL_SEPARATOR$privateKeyStatus"
     )
-    return New-SectionOutput "SSL CERTIFICATE INFO" $lineScriptBlocks
 }
 
-function Get-ExpirationsAndCapacityDepletionsReportSection($licenseSummary) {
-    # Deliberately just the Saga license half of what the older tool this is ported from covers
-    # under this same heading - the SSL certificate half is left out here, since AyfieInspector's
-    # SAGA CERTIFICATE section already shows its own days-remaining figure
-    # ("expires 2026-11-15 (78 days)"), and computing it again here would mean either re-resolving
-    # the certificate a second time or fragile-parsing it back out of already-rendered text.
+function Add-SslCertificateDetailToWinspectReport($winspectReportText, $detailLines) {
+    Write-FunctionCallLog $PSBoundParameters
+    # Appended into Winspect's own SAGA SSL CERTIFICATE INFO section (the -certificateSectionLabel
+    # renamed ADDITIONAL CERTIFICATE section, right after its own live-vs-file summary line) -
+    # merges what used to be two separate sections about the same certificate into one. Same
+    # established text-surgery approach as the other Add-*ToWinspectReport/ToReportInfo functions,
+    # but appends within a section instead of inserting a whole new one or a single line: finds the
+    # section header, then the first blank line after it (New-SectionOutput always closes every
+    # section with exactly one trailing blank line), and inserts these lines immediately before
+    # that blank line.
+    $detailLinesFormatted = (Complete-Report ($detailLines -join $PHYSICAL_NEWLINE)) -join $PHYSICAL_NEWLINE
+    $sectionHeaderLine = Get-SectionHeader "SAGA SSL CERTIFICATE INFO"
+    $lines = @($winspectReportText -split $PHYSICAL_NEWLINE)
+    $sectionHeaderIndex = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -eq $sectionHeaderLine) {
+            $sectionHeaderIndex = $i
+            break
+        }
+    }
+    if ($sectionHeaderIndex -eq -1) {
+        Write-WarningLog "Could not find Winspect's SAGA SSL CERTIFICATE INFO section header to append certificate detail to"
+        Write-ReturnValue $winspectReportText
+    } else {
+        $contentEndIndex = $sectionHeaderIndex + 1
+        while (($contentEndIndex -lt $lines.Count) -and ($lines[$contentEndIndex].Trim() -ne "")) {
+            $contentEndIndex++
+        }
+        $linesBefore = $lines[0..($contentEndIndex - 1)]
+        $linesAfter = if ($contentEndIndex -lt $lines.Count) { $lines[$contentEndIndex..($lines.Count - 1)] } else { @() }
+        $newLines = $linesBefore + $detailLinesFormatted + $linesAfter
+        Write-ReturnValue ($newLines -join $PHYSICAL_NEWLINE)
+    }
+}
+
+function Get-ExpirationsAndCapacityDepletionsReportSection($licenseSummary, $certificateFilePath) {
+    # Both days-left figures resolved fresh here rather than reused from elsewhere. The SSL
+    # certificate one only needs a local file read (unlike SAGA CERTIFICATE's live HTTPS check,
+    # which really would be worth avoiding a second time) - not a meaningful redundancy, so no
+    # need to thread a shared value in from Get-SslCertificateDetailReportSection instead.
     $daysUntilSagaLicenseExpires = "Unavailable"
     try {
         $daysUntilSagaLicenseExpires = Get-DaysUntilSagaLicenseExpires $licenseSummary
     } catch {
         Write-Warning "Failed to determine days until Saga license expiration: $_"
     }
-    # Plain (unclosed) scriptblock - see the SOLR INFO note above for why GetNewClosure() would be
+    $daysUntilSslCertificateExpires = "Unavailable"
+    if ($certificateFilePath -ne "") {
+        try {
+            $certificate = Get-CertificateFromFile $certificateFilePath
+            $daysUntilSslCertificateExpires = (New-TimeSpan -Start (Get-Date) -End $certificate.NotAfter).Days
+        } catch {
+            Write-Warning "Failed to determine days until SSL certificate expiration: $_"
+        }
+    }
+    # Plain (unclosed) scriptblocks - see the SOLR INFO note above for why GetNewClosure() would be
     # wrong, not just unnecessary, here.
     $lineScriptBlocks = @(
-        { "Days left of Saga license$FIELD_LABEL_SEPARATOR$daysUntilSagaLicenseExpires" }
+        { "Days left of Saga license$FIELD_LABEL_SEPARATOR$daysUntilSagaLicenseExpires" },
+        { "Days left of SSL certificate$FIELD_LABEL_SEPARATOR$daysUntilSslCertificateExpires" }
     )
     return New-SectionOutput "EXPIRATIONS AND CAPACITY DEPLETIONS" $lineScriptBlocks
 }
@@ -343,6 +394,48 @@ function Add-CustomerNameToReportInfo($winspectReportText, $customerName) {
         $linesBefore = $lines[0..$reportInfoHeaderIndex]
         $linesAfter = if ($reportInfoHeaderIndex -lt $lines.Count - 1) { $lines[($reportInfoHeaderIndex + 1)..($lines.Count - 1)] } else { @() }
         $newLines = $linesBefore + $customerLineFormatted + $linesAfter
+        Write-ReturnValue ($newLines -join $PHYSICAL_NEWLINE)
+    }
+}
+
+function Add-ExpirationsSectionToWinspectReport($winspectReportText, $expirationsSectionText) {
+    Write-FunctionCallLog $PSBoundParameters
+    # Spliced in right before Winspect's own CERTIFICATES section - the first section after REPORT
+    # INFO - so EXPIRATIONS AND CAPACITY DEPLETIONS lands as the report's 2nd block overall, matching
+    # ConfigInspector's own position for it (Morten's call: it belongs there, not appended after all
+    # of Winspect's own sections like the rest of AyfieInspector's new sections). Same established
+    # text-surgery pattern as Add-CustomerNameToReportInfo/Add-AyfieInspectorVersionToReportInfo
+    # above - matched by exact equality against Get-SectionHeader's own reconstruction (not a
+    # substring search), for the same "wrong line" reason documented on Add-CustomerNameToReportInfo.
+    $expirationsSectionFormatted = (Complete-Report $expirationsSectionText) -join $PHYSICAL_NEWLINE
+    # New-SectionOutput's own trailing blank-line separator is already baked into
+    # $expirationsSectionFormatted - splitting it back into lines below produces more than one
+    # trailing empty array element (a byproduct of splitting a string that already ends with the
+    # delimiter), which would double the blank line once spliced in among $winspectReportText's own
+    # lines. Trimmed to exactly one so the splice reproduces a single blank line, not two -
+    # confirmed by a real test failure this caused (11 double-blank-line instances across the
+    # report) before this trim was added.
+    $expirationsSectionLines = @($expirationsSectionFormatted -split $PHYSICAL_NEWLINE)
+    while (($expirationsSectionLines.Count -gt 0) -and ($expirationsSectionLines[-1] -eq "")) {
+        $expirationsSectionLines = $expirationsSectionLines[0..($expirationsSectionLines.Count - 2)]
+    }
+    $expirationsSectionLines += ""
+    $certificatesHeaderLine = Get-SectionHeader "CERTIFICATES"
+    $lines = @($winspectReportText -split $PHYSICAL_NEWLINE)
+    $certificatesHeaderIndex = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -eq $certificatesHeaderLine) {
+            $certificatesHeaderIndex = $i
+            break
+        }
+    }
+    if ($certificatesHeaderIndex -eq -1) {
+        Write-WarningLog "Could not find Winspect's CERTIFICATES section header to splice the EXPIRATIONS AND CAPACITY DEPLETIONS section before"
+        Write-ReturnValue $winspectReportText
+    } else {
+        $linesBefore = if ($certificatesHeaderIndex -gt 0) { $lines[0..($certificatesHeaderIndex - 1)] } else { @() }
+        $linesAfter = $lines[$certificatesHeaderIndex..($lines.Count - 1)]
+        $newLines = $linesBefore + $expirationsSectionLines + $linesAfter
         Write-ReturnValue ($newLines -join $PHYSICAL_NEWLINE)
     }
 }
@@ -616,10 +709,10 @@ function Get-DatabaseConnectorConfigurationsReportSection($installDirPath) {
     return New-SectionOutput "DATABASE CONNECTOR CONFIGURATIONS" $lineScriptBlocks
 }
 
-function Get-AuthenticationMethodReportSection() {
+function Get-AuthenticationMethodReportSection($installDirPath) {
     $authenticationMethodSummary = "Unavailable"
     try {
-        $authenticationMethodSummary = Get-AuthenticationMethodSummary
+        $authenticationMethodSummary = Get-AuthenticationMethodSummary $installDirPath
     } catch {
         Write-Warning "Failed to determine the authentication method: $_"
     }
@@ -711,10 +804,14 @@ function Start-AyfieInspector() {
     }
 
     Write-Host "Running Winspect ($winspectPath) for generic host facts..."
-    $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel -certificateFilePath $resolvedCertificateFilePath -certificateHostname $resolvedCertificateHostname -certificateSectionLabel "SAGA CERTIFICATE" -gmsaAccountName $gmsaAccountName
+    $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel -certificateFilePath $resolvedCertificateFilePath -certificateHostname $resolvedCertificateHostname -certificateSectionLabel "SAGA SSL CERTIFICATE INFO" -gmsaAccountName $gmsaAccountName -monitoringPeriodMinutes $monitoringPeriodMinutes -monitoringSamplingInSeconds $monitoringSamplingInSeconds
     $winspectReportText = $winspectReportLines -join $PHYSICAL_NEWLINE
     $winspectReportText = Add-AyfieInspectorVersionToReportInfo $winspectReportText
     $winspectReportText = Add-CustomerNameToReportInfo $winspectReportText $resolvedLicenseSummary.CustomerName
+    $expirationsSectionRaw = Get-ExpirationsAndCapacityDepletionsReportSection $resolvedLicenseSummary $resolvedCertificateFilePath
+    $winspectReportText = Add-ExpirationsSectionToWinspectReport $winspectReportText $expirationsSectionRaw
+    $sslCertificateDetailLines = Get-SslCertificateDetailLines $resolvedCertificateFilePath
+    $winspectReportText = Add-SslCertificateDetailToWinspectReport $winspectReportText $sslCertificateDetailLines
 
     if ($logLevel -ne "off") {
         # Winspect's own Get-LogFilePath names its log after Winspect's own script path - now that
@@ -735,21 +832,20 @@ function Start-AyfieInspector() {
     }
 
     # Section order is deliberately importance-first: short, urgent/actionable facts before large,
-    # rarely-searched-for dumps - firewall/schedule/count first, then refiners, then the
-    # potentially large rule definitions last.
-    $newSectionsRaw = Get-SslCertificateDetailReportSection $resolvedCertificateFilePath
-
-    $newSectionsRaw += Get-ExpirationsAndCapacityDepletionsReportSection $resolvedLicenseSummary
-
+    # rarely-searched-for dumps - firewall/schedule/count first, then refiners, then the potentially
+    # large rule definitions last. EXPIRATIONS AND CAPACITY DEPLETIONS and the SSL certificate detail
+    # fields were already spliced into $winspectReportText above (as the report's 2nd block, and
+    # merged into Winspect's own SAGA SSL CERTIFICATE INFO section, respectively) - neither is part
+    # of this append-after-Winspect's-own-sections list.
     if ($skipFirewallCheck) {
         Write-Host "Skipping firewall openings check (-skipFirewallCheck)..."
     } else {
         Write-Host "Checking firewall openings (this can take a while)..."
     }
-    $newSectionsRaw += Get-FirewallOpeningsReportSection
+    $newSectionsRaw = Get-FirewallOpeningsReportSection
 
     Write-Host "Determining the authentication method..."
-    $newSectionsRaw += Get-AuthenticationMethodReportSection
+    $newSectionsRaw += Get-AuthenticationMethodReportSection $resolvedInstallDirPath
 
     $newSectionsRaw += Get-DataSourceUserSyncingReportSection $resolvedInstallDirPath
 

@@ -13,14 +13,14 @@ Describe "Invoke-AyfieInspector end-to-end" {
         # rather than error out - that graceful-degradation behavior is exactly what's asserted.
         Push-Location $TestDrive
         try {
-            $output = (& $ayfieInspectorScript -outputFormat text -outputDestination terminal -skipFirewallCheck 2>$null) -join "`n"
+            $output = (& $ayfieInspectorScript -outputFormat text -outputDestination terminal -skipFirewallCheck -monitoringSamplingInSeconds 0 2>$null) -join "`n"
         } finally {
             Pop-Location
         }
 
         $sectionOrder = @(
-            "REPORT INFO", "CERTIFICATES", "HOST IDENTITY", "NETWORK", "SYSTEM RESOURCES",
-            "RESOURCE USAGE", "SSL CERTIFICATE INFO", "EXPIRATIONS AND CAPACITY DEPLETIONS", "FIREWALL OPENINGS",
+            "REPORT INFO", "EXPIRATIONS AND CAPACITY DEPLETIONS", "CERTIFICATES", "HOST IDENTITY", "NETWORK",
+            "SYSTEM RESOURCES", "RESOURCE USAGE", "FIREWALL OPENINGS",
             "AUTHENTICATION METHOD",
             "DATA SOURCE USER SYNCING", "SAGA INFO", "BACKUPS", "SAGA LICENSE INFO",
             "CUSTOM.ENV FILE CONTENT", "TEMPORARY .ENV FILE CHANGES",
@@ -49,7 +49,7 @@ Describe "Invoke-AyfieInspector end-to-end" {
         # New-SectionOutput already appends to every section.
         Push-Location $TestDrive
         try {
-            $output = (& $ayfieInspectorScript -outputFormat text -outputDestination terminal -skipFirewallCheck 2>$null) -join "`n"
+            $output = (& $ayfieInspectorScript -outputFormat text -outputDestination terminal -skipFirewallCheck -monitoringSamplingInSeconds 0 2>$null) -join "`n"
         } finally {
             Pop-Location
         }
@@ -73,7 +73,7 @@ Describe "Invoke-AyfieInspector end-to-end" {
     It "writes a report file into the current directory when the destination includes file" {
         Push-Location $TestDrive
         try {
-            & $ayfieInspectorScript -outputFormat text -outputDestination file -skipFirewallCheck 2>$null | Out-Null
+            & $ayfieInspectorScript -outputFormat text -outputDestination file -skipFirewallCheck -monitoringSamplingInSeconds 0 2>$null | Out-Null
             Test-Path (Join-Path $TestDrive "ayfieinspector-report.txt") | Should -BeTrue
         } finally {
             Pop-Location
@@ -83,7 +83,7 @@ Describe "Invoke-AyfieInspector end-to-end" {
     It "skips the firewall check and says so when -skipFirewallCheck is passed" {
         Push-Location $TestDrive
         try {
-            $output = (& $ayfieInspectorScript -outputFormat text -outputDestination terminal -skipFirewallCheck 2>$null) -join "`n"
+            $output = (& $ayfieInspectorScript -outputFormat text -outputDestination terminal -skipFirewallCheck -monitoringSamplingInSeconds 0 2>$null) -join "`n"
         } finally {
             Pop-Location
         }

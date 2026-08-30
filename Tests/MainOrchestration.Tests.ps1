@@ -46,51 +46,152 @@ BeforeAll {
     }
 }
 
-Describe "Get-SslCertificateDetailReportSection" {
-    It "includes the certificate authority, subject alternative names, and private key status when everything succeeds" {
-        Mock Get-CertificateFromFile { [pscustomobject]@{ Issuer = "CN=DigiCert Global CA" } }
+Describe "Get-SslCertificateDetailLines" {
+    # No longer its own section (no header, no live-vs-file check) - merged into Winspect's own
+    # SAGA SSL CERTIFICATE INFO section by Add-SslCertificateDetailToWinspectReport below, since
+    # that already has its own live-vs-file issuer check; this only resolves the extra fields it
+    # can't expose (it never hands the resolved certificate object back to its caller).
+    It "resolves certificate file name, authority, expiration date, subject alternative names, and private key status" {
+        Mock Get-CertificateFromFile { [pscustomobject]@{ Issuer = "CN=DigiCert Global CA"; NotAfter = [datetime]"2026-10-24" } }
         Mock Get-CertificateAuthority { "CN=DigiCert Global CA" }
         Mock Get-CertificateSubjectAlternativeNames { "search.example.com, search-alt.example.com" }
         Mock Get-CertificateKeyEncryptionStatus { "Encrypted" }
 
-        $result = Get-SslCertificateDetailReportSection "C:\Saga\volumes\Traefik\certs\gateway.crt"
+        $result = Get-SslCertificateDetailLines "C:\Saga\volumes\Traefik\certs\gateway.crt"
 
-        $result | Should -Match "SSL CERTIFICATE INFO"
-        $result | Should -Match "Certificate authority.*CN=DigiCert Global CA"
-        $result | Should -Match "Subject alternative names.*search.example.com, search-alt.example.com"
-        $result | Should -Match "Private key.*Encrypted"
+        $result | Should -Contain "Certificate file${FIELD_LABEL_SEPARATOR}gateway.crt"
+        $result | Should -Contain "Certificate authority${FIELD_LABEL_SEPARATOR}CN=DigiCert Global CA"
+        $result | Should -Contain "Expiration date${FIELD_LABEL_SEPARATOR}2026-10-24"
+        $result | Should -Contain "Subject alternative names${FIELD_LABEL_SEPARATOR}search.example.com, search-alt.example.com"
+        $result | Should -Contain "Private key${FIELD_LABEL_SEPARATOR}Encrypted"
+    }
+
+    It "shows only the filename, not the full path, for the certificate file" {
+        # Regression test: this used to omit the certificate filename entirely - confirmed missing
+        # versus ConfigInspector's own "Certificate file: <name>.crt" line during a real KTH
+        # comparison. Matches ConfigInspector's own convention of showing just the filename.
+        Mock Get-CertificateFromFile { [pscustomobject]@{ Issuer = "CN=DigiCert Global CA"; NotAfter = [datetime]"2026-10-24" } }
+        Mock Get-CertificateAuthority { "CN=DigiCert Global CA" }
+        Mock Get-CertificateSubjectAlternativeNames { "search.example.com" }
+        Mock Get-CertificateKeyEncryptionStatus { "Encrypted" }
+
+        $result = Get-SslCertificateDetailLines "C:\Saga\volumes\Traefik\certs\kth-search-prod.sys.kth.se.crt"
+
+        $result | Should -Contain "Certificate file${FIELD_LABEL_SEPARATOR}kth-search-prod.sys.kth.se.crt"
     }
 
     It "reports every field as 'Unavailable' when no certificate file path is known" {
         Mock Get-CertificateFromFile { throw "should not be called" }
 
-        $result = Get-SslCertificateDetailReportSection ""
+        $result = Get-SslCertificateDetailLines ""
 
-        $result | Should -Match "Certificate authority.*Unavailable"
-        $result | Should -Match "Subject alternative names.*Unavailable"
-        $result | Should -Match "Private key.*Unavailable"
+        $result | Should -Contain "Certificate file${FIELD_LABEL_SEPARATOR}Unavailable"
+        $result | Should -Contain "Certificate authority${FIELD_LABEL_SEPARATOR}Unavailable"
+        $result | Should -Contain "Expiration date${FIELD_LABEL_SEPARATOR}Unavailable"
+        $result | Should -Contain "Subject alternative names${FIELD_LABEL_SEPARATOR}Unavailable"
+        $result | Should -Contain "Private key${FIELD_LABEL_SEPARATOR}Unavailable"
     }
 
     It "still reports the private key status when the certificate file itself can't be read" {
         Mock Get-CertificateFromFile { throw "file not found" }
         Mock Get-CertificateKeyEncryptionStatus { "Unencrypted" }
 
-        $result = Get-SslCertificateDetailReportSection "C:\Saga\volumes\Traefik\certs\gateway.crt"
+        $result = Get-SslCertificateDetailLines "C:\Saga\volumes\Traefik\certs\gateway.crt"
 
-        $result | Should -Match "Certificate authority.*Unavailable"
-        $result | Should -Match "Private key.*Unencrypted"
+        $result | Should -Contain "Certificate authority${FIELD_LABEL_SEPARATOR}Unavailable"
+        $result | Should -Contain "Private key${FIELD_LABEL_SEPARATOR}Unencrypted"
     }
 
     It "degrades gracefully to 'Unavailable' when the private key file itself can't be read" {
-        Mock Get-CertificateFromFile { [pscustomobject]@{ Issuer = "CN=DigiCert Global CA" } }
+        Mock Get-CertificateFromFile { [pscustomobject]@{ Issuer = "CN=DigiCert Global CA"; NotAfter = [datetime]"2026-10-24" } }
         Mock Get-CertificateAuthority { "CN=DigiCert Global CA" }
         Mock Get-CertificateSubjectAlternativeNames { "search.example.com" }
         Mock Get-CertificateKeyEncryptionStatus { throw "key file not found" }
 
-        $result = Get-SslCertificateDetailReportSection "C:\Saga\volumes\Traefik\certs\gateway.crt"
+        $result = Get-SslCertificateDetailLines "C:\Saga\volumes\Traefik\certs\gateway.crt"
 
-        $result | Should -Match "Certificate authority.*CN=DigiCert Global CA"
-        $result | Should -Match "Private key.*Unavailable"
+        $result | Should -Contain "Certificate authority${FIELD_LABEL_SEPARATOR}CN=DigiCert Global CA"
+        $result | Should -Contain "Private key${FIELD_LABEL_SEPARATOR}Unavailable"
+    }
+}
+
+Describe "Add-SslCertificateDetailToWinspectReport" {
+    # SAGA CERTIFICATE and SSL CERTIFICATE INFO used to be two separate sections about the exact
+    # same certificate - merged into one ("SAGA SSL CERTIFICATE INFO") on Morten's call, appending
+    # AyfieInspector's extra fields directly into Winspect's own section rather than keeping a
+    # second header for the same certificate.
+    It "appends the detail lines inside the SAGA SSL CERTIFICATE INFO section, before its trailing blank line" {
+        $sagaCertHeader = Get-SectionHeader "SAGA SSL CERTIFICATE INFO"
+        $winspectReportText = @(
+            $sagaCertHeader,
+            "kth-search-prod.sys.kth.se -> expires 2026-10-24 (54 days) - checked live via HTTPS (issuer matches the certificate file)",
+            "",
+            "###################### HOST IDENTITY #######################",
+            "Hostname: kth-search-prod"
+        ) -join $PHYSICAL_NEWLINE
+
+        $result = Add-SslCertificateDetailToWinspectReport $winspectReportText @("Certificate file: gateway.crt", "Private key: Unencrypted")
+        $resultLines = @($result -split $PHYSICAL_NEWLINE)
+
+        $sagaCertHeaderIndex = [array]::IndexOf($resultLines, $sagaCertHeader)
+        $summaryLineIndex = $sagaCertHeaderIndex + 1
+        $resultLines[$summaryLineIndex + 1] | Should -Be "Certificate file: gateway.crt"
+        $resultLines[$summaryLineIndex + 2] | Should -Be "Private key: Unencrypted"
+        $resultLines[$summaryLineIndex + 3] | Should -Be ""
+        $resultLines[$summaryLineIndex + 4] | Should -Be "###################### HOST IDENTITY #######################"
+    }
+
+    It "returns the original text unchanged if Winspect's SAGA SSL CERTIFICATE INFO section header can't be found" {
+        # e.g. the section is omitted entirely by Winspect when neither a certificate file nor a
+        # live hostname was available to check in the first place.
+        $winspectReportText = @(
+            "####################### REPORT INFO ########################",
+            "Local time: 2026-08-30 12:00:00"
+        ) -join $PHYSICAL_NEWLINE
+
+        $result = Add-SslCertificateDetailToWinspectReport $winspectReportText @("Certificate file: gateway.crt")
+
+        $result | Should -Be $winspectReportText
+    }
+}
+
+Describe "Add-ExpirationsSectionToWinspectReport" {
+    It "inserts the EXPIRATIONS section directly before Winspect's own CERTIFICATES header, as the report's 2nd block" {
+        # Regression test: this section used to only ever appear after all of Winspect's own
+        # sections (RESOURCE USAGE etc.) - Morten wanted it as the 2nd block overall, matching
+        # ConfigInspector's own position for it, right after REPORT INFO.
+        $certificatesHeader = Get-SectionHeader "CERTIFICATES"
+        $winspectReportText = @(
+            "####################### REPORT INFO ########################",
+            "Local time: 2026-08-30 12:00:00",
+            "",
+            $certificatesHeader,
+            "Certificate expirations: none"
+        ) -join $PHYSICAL_NEWLINE
+        Mock Get-DaysUntilSagaLicenseExpires { "Perpetual" }
+        Mock Get-CertificateFromFile { [pscustomobject]@{ NotAfter = (Get-Date).AddDays(54).AddMinutes(5) } }
+        $expirationsSectionRaw = Get-ExpirationsAndCapacityDepletionsReportSection ([pscustomobject]@{}) "C:\Saga\volumes\Traefik\certs\gateway.crt"
+
+        $result = Add-ExpirationsSectionToWinspectReport $winspectReportText $expirationsSectionRaw
+        $resultLines = @($result -split $PHYSICAL_NEWLINE)
+
+        $expirationsHeaderIndex = [array]::IndexOf($resultLines, (Get-SectionHeader "EXPIRATIONS AND CAPACITY DEPLETIONS"))
+        $certificatesHeaderIndex = [array]::IndexOf($resultLines, $certificatesHeader)
+        $expirationsHeaderIndex | Should -BeGreaterThan -1
+        $expirationsHeaderIndex | Should -BeLessThan $certificatesHeaderIndex
+        $resultLines | Should -Contain "Days left of Saga license${FIELD_LABEL_SEPARATOR}Perpetual"
+        $resultLines | Should -Contain "Days left of SSL certificate${FIELD_LABEL_SEPARATOR}54"
+    }
+
+    It "returns the original text unchanged if Winspect's CERTIFICATES section header can't be found" {
+        $winspectReportText = @(
+            "####################### REPORT INFO ########################",
+            "Local time: 2026-08-30 12:00:00"
+        ) -join $PHYSICAL_NEWLINE
+
+        $result = Add-ExpirationsSectionToWinspectReport $winspectReportText "some expirations text"
+
+        $result | Should -Be $winspectReportText
     }
 }
 
@@ -743,21 +844,41 @@ Describe "Get-SagaLicenseInfoReportSection" {
 }
 
 Describe "Get-ExpirationsAndCapacityDepletionsReportSection" {
-    It "includes the days-left figure under the section heading" {
+    It "includes the Saga license and SSL certificate days-left figures under the section heading" {
+        # Regression test: the SSL certificate half used to be left out of this section entirely
+        # (the days-left figure was only ever visible tucked inside SAGA CERTIFICATE's one-line
+        # summary) - confirmed missing versus ConfigInspector's own "Days left of SSL certificate"
+        # line, which sits right here, during a real KTH comparison.
         Mock Get-DaysUntilSagaLicenseExpires { 94 }
+        # A few minutes' buffer past the 54-day mark, not exactly on it - the function computes its
+        # own "now" a moment after this mock's "now", and without a buffer that tiny gap can push
+        # the truncated day count down to 53, making the test flaky.
+        Mock Get-CertificateFromFile { [pscustomobject]@{ NotAfter = (Get-Date).AddDays(54).AddMinutes(5) } }
 
-        $result = Get-ExpirationsAndCapacityDepletionsReportSection ([pscustomobject]@{})
+        $result = Get-ExpirationsAndCapacityDepletionsReportSection ([pscustomobject]@{}) "C:\Saga\volumes\Traefik\certs\gateway.crt"
 
         $result | Should -Match "EXPIRATIONS AND CAPACITY DEPLETIONS"
         $result | Should -Match "Days left of Saga license.*94"
+        $result | Should -Match "Days left of SSL certificate.*54"
     }
 
-    It "degrades gracefully (no crash, 'Unavailable') when the check itself fails" {
+    It "degrades gracefully (no crash, 'Unavailable') when either check fails" {
         Mock Get-DaysUntilSagaLicenseExpires { throw "should not normally throw, but handled anyway" }
+        Mock Get-CertificateFromFile { throw "file not found" }
 
-        $result = Get-ExpirationsAndCapacityDepletionsReportSection ([pscustomobject]@{})
+        $result = Get-ExpirationsAndCapacityDepletionsReportSection ([pscustomobject]@{}) "C:\Saga\volumes\Traefik\certs\gateway.crt"
 
         $result | Should -Match "Days left of Saga license.*Unavailable"
+        $result | Should -Match "Days left of SSL certificate.*Unavailable"
+    }
+
+    It "reports 'Unavailable' for the SSL certificate when no certificate file path is known" {
+        Mock Get-DaysUntilSagaLicenseExpires { 94 }
+        Mock Get-CertificateFromFile { throw "should not be called" }
+
+        $result = Get-ExpirationsAndCapacityDepletionsReportSection ([pscustomobject]@{}) ""
+
+        $result | Should -Match "Days left of SSL certificate.*Unavailable"
     }
 }
 

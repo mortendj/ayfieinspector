@@ -59,6 +59,17 @@ per script), named after each script the same way Winspect names its own.
 Skips the outbound connectivity check (~15 URLs Ayfie/Saga itself needs reachable) - useful to
 avoid the added time when firewall state is already known or hasn't changed since the last run.
 
+.PARAMETER monitoringPeriodMinutes
+Passed straight through to Winspect's own -monitoringPeriodMinutes: minutes of CPU/memory samples
+to average over for the RESOURCE USAGE section, default is 2. Sampling runs in a background job
+started as soon as parameters are parsed, so it mostly overlaps with the rest of the report instead
+of adding to it.
+
+.PARAMETER monitoringSamplingInSeconds
+Passed straight through to Winspect's own -monitoringSamplingInSeconds: seconds between each sample
+within the monitoring period, default is 10. Set to 0 to skip monitoring and fall back to a single
+instantaneous reading.
+
 .PARAMETER certificateFilePath
 Path to the Saga gateway certificate file. By default the certificate is checked live over HTTPS
 against the configured gateway hostname (auto-discovered from the running licensing container's
@@ -102,6 +113,12 @@ param(
     [string]$logLevel = "off",
 
     [switch]$skipFirewallCheck,
+
+    [Parameter(Mandatory=$false)]
+    [double]$monitoringPeriodMinutes = 2,
+
+    [Parameter(Mandatory=$false)]
+    [int]$monitoringSamplingInSeconds = 10,
 
     [string]$certificateFilePath = "",
 
