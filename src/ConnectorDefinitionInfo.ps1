@@ -27,3 +27,33 @@ function Get-ConnectorDefinitionSummary($installDirPath) {
     }
     Write-ReturnValue ($blocks -join ($LOGICAL_NEWLINE + $LOGICAL_NEWLINE))
 }
+
+function Test-HasRestrictedSecuritySource($installDirPath) {
+    Write-FunctionCallLog $PSBoundParameters
+    # Used by Get-AuthenticationMethodSummary to say something concrete about whether a Keycloak
+    # local account (or any other authenticated session) can actually see restricted data, rather
+    # than just noting the account exists - confirmed on a real KTH host where a connector's
+    # SecuritySources granted every document to $EVERYONE_SID, so any authenticated session saw
+    # everything regardless of identity. A missing SecuritySources block counts the same as
+    # everything-is-Everyone (no restriction found), not as its own separate case.
+    $hasRestrictedSource = $false
+    if ($installDirPath -ne "") {
+        $connectorsRootPath = Join-Path $installDirPath $CONNECTORS_ROOT_RELATIVE_PATH
+        if (Test-Path $connectorsRootPath) {
+            $connectorDirs = @(Get-ChildItem -Path $connectorsRootPath -Directory)
+            foreach ($connectorDir in $connectorDirs) {
+                $connectorDefFilePath = Join-Path $connectorDir.FullName $CONNECTOR_DEFINITION_RELATIVE_PATH
+                if (Test-Path $connectorDefFilePath) {
+                    $definitionContent = Get-Content -Path $connectorDefFilePath -Raw
+                    $sidMatches = [regex]::Matches($definitionContent, '<SID\s+value="([^"]+)"')
+                    foreach ($sidMatch in $sidMatches) {
+                        if ($sidMatch.Groups[1].Value -ne $EVERYONE_SID) {
+                            $hasRestrictedSource = $true
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Write-ReturnValue $hasRestrictedSource
+}

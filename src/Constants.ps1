@@ -3,8 +3,8 @@
 # Named distinctly from Winspect's own $SCRIPT_VERSION/$SCRIPT_NAME (Constants.ps1) - Invoke-
 # AyfieInspector.ps1 dot-sources Winspect's Constants.ps1 too, and those names are already claimed
 # there.
-$AYFIE_INSPECTOR_VERSION           = "0.22.0"
-$AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-28"
+$AYFIE_INSPECTOR_VERSION           = "1.0.1"
+$AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-30"
 $AYFIE_INSPECTOR_NAME              = "AyfieInspector"
 $AYFIE_INSPECTOR_VERSION_STRING    = "$AYFIE_INSPECTOR_NAME v. $AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
 
@@ -59,6 +59,22 @@ $COMPONENT_TABLE                    = "public.component"
 $USER_STORAGE_PROVIDER_TYPE         = "org.keycloak.storage.UserStorageProvider"
 $IDENTITY_PROVIDER_AUTH_METHOD_NAME = "Entra ID"
 $USER_FEDERATION_AUTH_METHOD_NAME   = "Active Directory"
+# Local, realm-native Keycloak accounts (created directly in the realm, not synced from anywhere)
+# are a third way to authenticate that neither identity_provider nor component covers - confirmed on
+# a real KTH host where API access kept working via exactly such an account while this section
+# reported zero of the two supported mechanisms configured. federation_link IS NULL excludes users
+# synced in by a user-storage/federation provider; service_account_client_link IS NULL excludes
+# Keycloak's own auto-created per-client service-account users, neither of which is a human/API
+# account someone deliberately set up the way a genuine local account is.
+$USER_ENTITY_TABLE                  = "public.user_entity"
+# saga_admin exists in every Saga realm regardless of whether real application authentication is
+# configured - it's the fixed Keycloak console-admin bootstrap account Saga's own deployment
+# provisions (KEYCLOAK_USER=saga_admin in index's deploy/saga/docker/TEMPLATE-.env, the baseline
+# every install derives its .env from), not something customer-specific. It exists purely to log
+# into Keycloak's own admin console, never the actual application, so it must not count toward
+# "local accounts that might explain application access" - confirmed by Morten on a real KTH host.
+$SAGA_ADMIN_USERNAME                = "saga_admin"
+$LOCAL_USER_WHERE_CLAUSE            = "federation_link IS NULL AND service_account_client_link IS NULL AND username != '$SAGA_ADMIN_USERNAME'"
 
 ################## OS SUPPORT ##################
 
@@ -126,6 +142,10 @@ $CONNECTOR_CONTAINER_NAME_PATTERN = "ayfie-connector-(\w+)"
 
 $CONNECTORS_ROOT_RELATIVE_PATH       = "volumes\Connector"
 $CONNECTOR_DEFINITION_RELATIVE_PATH  = "ConnectorDefinition\ConnectorDefinition.xml"
+# The well-known Windows "Everyone" SID - used by Get-AuthenticationMethodSummary (via
+# Test-HasRestrictedSecuritySource below) to tell whether a connector's SecuritySources actually
+# restrict document access per-user, or grant it to literally everyone.
+$EVERYONE_SID                        = "S-1-1-0"
 
 ################## CONNECTORS ##################
 

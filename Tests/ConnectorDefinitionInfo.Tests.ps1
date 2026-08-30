@@ -60,3 +60,51 @@ Describe "Get-ConnectorDefinitionSummary" {
         $result | Should -Not -Match "Connector: sharepoint"
     }
 }
+
+Describe "Test-HasRestrictedSecuritySource" {
+    # Used by Get-AuthenticationMethodSummary to say something concrete about whether an
+    # authenticated session (e.g. a local Keycloak account) can actually see restricted data -
+    # confirmed on a real KTH host where a connector granted every document to S-1-1-0 ("Everyone").
+
+    It "reports false when every SID found is Everyone (S-1-1-0)" {
+        $installDirPath = Join-Path $TestDrive "saga-install-everyone-only"
+        New-TestConnectorDefinition $installDirPath "GenericSQL" '<SecuritySources><add name="everyone" type="StaticSecuritySource"><SID value="S-1-1-0" /></add></SecuritySources>'
+
+        Test-HasRestrictedSecuritySource $installDirPath | Should -BeFalse
+    }
+
+    It "reports true when a SID other than Everyone is found" {
+        $installDirPath = Join-Path $TestDrive "saga-install-restricted"
+        New-TestConnectorDefinition $installDirPath "SharePoint" '<SecuritySources><add name="scoped" type="StaticSecuritySource"><SID value="S-1-5-21-111-222-333-1001" /></add></SecuritySources>'
+
+        Test-HasRestrictedSecuritySource $installDirPath | Should -BeTrue
+    }
+
+    It "reports false (same as all-Everyone) when no connector has a SecuritySources block at all" {
+        # Morten's call: a missing SecuritySources block is treated the same as everything being
+        # Everyone - both mean "no per-user restriction found", not a separate third case.
+        $installDirPath = Join-Path $TestDrive "saga-install-no-security-sources"
+        New-TestConnectorDefinition $installDirPath "fileserver" "<ConnectorDefinition></ConnectorDefinition>"
+
+        Test-HasRestrictedSecuritySource $installDirPath | Should -BeFalse
+    }
+
+    It "reports false when the connectors root doesn't exist at all" {
+        $installDirPath = Join-Path $TestDrive "saga-install-no-connectors-dir-2"
+        New-Item -ItemType Directory -Path $installDirPath -Force | Out-Null
+
+        Test-HasRestrictedSecuritySource $installDirPath | Should -BeFalse
+    }
+
+    It "reports false when no install directory is known" {
+        Test-HasRestrictedSecuritySource "" | Should -BeFalse
+    }
+
+    It "reports true if even one connector among several has a restricted SID" {
+        $installDirPath = Join-Path $TestDrive "saga-install-mixed"
+        New-TestConnectorDefinition $installDirPath "web" '<SecuritySources><add name="everyone" type="StaticSecuritySource"><SID value="S-1-1-0" /></add></SecuritySources>'
+        New-TestConnectorDefinition $installDirPath "SharePoint" '<SecuritySources><add name="scoped" type="StaticSecuritySource"><SID value="S-1-5-21-111-222-333-1001" /></add></SecuritySources>'
+
+        Test-HasRestrictedSecuritySource $installDirPath | Should -BeTrue
+    }
+}

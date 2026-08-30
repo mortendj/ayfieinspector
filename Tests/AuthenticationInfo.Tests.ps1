@@ -5,6 +5,7 @@ BeforeAll {
     . "$PSScriptRoot/../../Winspect/src/Logging.ps1"
     . "$PSScriptRoot/../../Winspect/src/Utilities.ps1"
     . "$PSScriptRoot/../src/Constants.ps1"
+    . "$PSScriptRoot/../src/ConnectorDefinitionInfo.ps1"
     . "$PSScriptRoot/../src/AuthenticationInfo.ps1"
 }
 
@@ -77,14 +78,68 @@ Describe "Get-UserFederationProviderCount" {
     }
 }
 
+Describe "Get-LocalUserAccountCount" {
+    It "queries public.user_entity excluding federated, service-account, and the saga_admin bootstrap users" {
+        # Regression test: saga_admin exists in every Saga realm regardless of whether real
+        # application authentication is configured (it's Keycloak's own console-admin bootstrap
+        # account, provisioned by Saga's deployment itself - KEYCLOAK_USER=saga_admin in every
+        # install's .env) - counting it toward "local accounts that might explain application
+        # access" is misleading, confirmed by Morten on a real KTH host.
+        $script:capturedArgs = $null
+        Mock Invoke-ExternalCommand {
+            param($commandName, $commandArgs)
+            $script:capturedArgs = $commandArgs
+            @("1")
+        }
+
+        Get-LocalUserAccountCount | Should -Be 1
+
+        $capturedSql = @($script:capturedArgs | Where-Object { $_ -match "SELECT" })[0]
+        $capturedSql | Should -Match "FROM public\.user_entity "
+        $capturedSql | Should -Match "federation_link IS NULL"
+        $capturedSql | Should -Match "service_account_client_link IS NULL"
+        $capturedSql | Should -Match "username != 'saga_admin'"
+    }
+}
+
 Describe "Get-AuthenticationMethodSummary" {
-    It "reports 'Not configured' when there are zero providers of either kind" {
+    It "reports 'Not configured' when there are zero providers of either kind and no local accounts" {
         # Regression case: real production hosts have legitimately had zero providers configured
         # (an in-progress deployment) - this must not throw or look like an error.
         Mock Get-IdentityProviderCount { 0 }
         Mock Get-UserFederationProviderCount { 0 }
+        Mock Get-LocalUserAccountCount { 0 }
 
-        Get-AuthenticationMethodSummary | Should -Be "Not configured (0 identity providers, 0 user federation providers)"
+        Get-AuthenticationMethodSummary "" | Should -Be "Not configured (0 identity providers, 0 user federation providers)"
+    }
+
+    It "states plainly when local accounts exist but no restricted security source was found" {
+        # Regression case: a real KTH host had zero identity providers and zero user federation
+        # providers configured, yet API access kept working via a locally-created Keycloak account
+        # (confirmed via its "source: local" attribute in the admin console) - this section used to
+        # report "Not configured" with nothing explaining why access still worked. An earlier version
+        # of this fix worded it as vague reassurance ("may be used for direct authentication") or as
+        # unresolved homework ("verify...") - Morten wanted a concrete answer instead: whether a
+        # connector's security sources actually restrict access per-user, or grant it to everyone.
+        Mock Get-IdentityProviderCount { 0 }
+        Mock Get-UserFederationProviderCount { 0 }
+        Mock Get-LocalUserAccountCount { 1 }
+        Mock Test-HasRestrictedSecuritySource { $false }
+
+        $result = Get-AuthenticationMethodSummary "C:\Saga"
+
+        $result | Should -Be "Not configured (0 identity providers, 0 user federation providers). 1 non-admin local Keycloak account(s) exist. All connector security sources are 'Everyone' (S-1-1-0) - no per-user document restriction found."
+    }
+
+    It "states plainly when local accounts exist and a restricted security source was found" {
+        Mock Get-IdentityProviderCount { 0 }
+        Mock Get-UserFederationProviderCount { 0 }
+        Mock Get-LocalUserAccountCount { 1 }
+        Mock Test-HasRestrictedSecuritySource { $true }
+
+        $result = Get-AuthenticationMethodSummary "C:\Saga"
+
+        $result | Should -Be "Not configured (0 identity providers, 0 user federation providers). 1 non-admin local Keycloak account(s) exist. Connector security sources include SIDs other than 'Everyone' - per-user document restriction may apply."
     }
 
     It "reports 'Entra ID' when there is exactly one identity provider and no user federation" {
@@ -92,20 +147,20 @@ Describe "Get-AuthenticationMethodSummary" {
         Mock Get-IdentityProviderCount { 1 }
         Mock Get-UserFederationProviderCount { 0 }
 
-        Get-AuthenticationMethodSummary | Should -Be "Entra ID"
+        Get-AuthenticationMethodSummary "" | Should -Be "Entra ID"
     }
 
     It "reports 'Active Directory' when there is exactly one user federation provider and no identity provider" {
         Mock Get-IdentityProviderCount { 0 }
         Mock Get-UserFederationProviderCount { 1 }
 
-        Get-AuthenticationMethodSummary | Should -Be "Active Directory"
+        Get-AuthenticationMethodSummary "" | Should -Be "Active Directory"
     }
 
     It "flags an ambiguous configuration rather than silently picking one when both are set" {
         Mock Get-IdentityProviderCount { 1 }
         Mock Get-UserFederationProviderCount { 1 }
 
-        Get-AuthenticationMethodSummary | Should -Match "^Ambiguous"
+        Get-AuthenticationMethodSummary "" | Should -Match "^Ambiguous"
     }
 }
