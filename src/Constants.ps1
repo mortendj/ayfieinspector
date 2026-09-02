@@ -3,8 +3,8 @@
 # Named distinctly from Winspect's own $SCRIPT_VERSION/$SCRIPT_NAME (Constants.ps1) - Invoke-
 # AyfieInspector.ps1 dot-sources Winspect's Constants.ps1 too, and those names are already claimed
 # there.
-$AYFIE_INSPECTOR_VERSION           = "1.0.1"
-$AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-30"
+$AYFIE_INSPECTOR_VERSION           = "1.1.0"
+$AYFIE_INSPECTOR_VERSION_TIMESTAMP = "2026-08-31"
 $AYFIE_INSPECTOR_NAME              = "AyfieInspector"
 $AYFIE_INSPECTOR_VERSION_STRING    = "$AYFIE_INSPECTOR_NAME v. $AYFIE_INSPECTOR_VERSION ($AYFIE_INSPECTOR_VERSION_TIMESTAMP)"
 
@@ -36,6 +36,7 @@ $DOT_ENV_RELATIVE_PATH        = "docker/.env"
 $SSL_CERTIFICATE_DIR          = "volumes/Traefik/certs"
 $GATEWAY_CERTIFICATE_NAME_KEY = "AYFIE_SAGA_GATEWAY_CERTIFICATE_NAME"
 $GATEWAY_HOSTNAME_KEY         = "AYFIE_SAGA_HOST_NAME"
+$AD_SERVICE_ACCOUNT_KEY       = "AYFIE_SAGA_AD_SERVICE_ACCOUNT"
 $BRANDING_KEY                 = "AYFIE_SAGA_BRANDING_KEY"
 $GIT_VERSION_RELATIVE_PATH    = "git.version"
 

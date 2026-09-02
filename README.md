@@ -8,13 +8,13 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** v1.0.1. The current release covers the rule engine,
+> **Status:** v1.1.0. The current release covers the rule engine,
 > custom refiners, Solr info (document count, index languages/memory/stack size/index size), the
 > scheduled restart task, an outbound firewall connectivity check, the Saga gateway/SSL certificate
 > (live-vs-file issuer comparison plus authority/expiration/SANs/private-key detail, all in one
 > section), the authentication method (identity provider/user federation, plus a local-account and
 > per-connector security-source check when neither is configured), AD/Azure AD data source syncing,
-> database info, backups, Docker images currently in use, an optional gMSA account check,
+> database info, backups, Docker images currently in use, a gMSA account check,
 > installation info (install directory, Saga version, branding, gateway hostname, OS support
 > status, installed/in-use connectors), Saga license info (customer ID, activation/expiration
 > dates, user/document capacity, licensed features), expirations and capacity depletions (days left
@@ -86,9 +86,14 @@ by hand.
 - **Backups:** number of backups found, the most recent backup's timestamp, and the total size on
   disk of the backup directory.
 - **Docker images currently in use:** the image:tag of every currently running container.
-- **gMSA account check** (opt-in, needs `-gmsaAccountName`): passed straight through to Winspect's
-  own gMSA validation, adding a `GMSA ACCOUNT` section reporting the account name and whether it
-  validates successfully.
+- **gMSA account check:** auto-discovered from the running installation's `.env`
+  (`AYFIE_SAGA_AD_SERVICE_ACCOUNT`) the same way the gateway certificate/hostname already are, so
+  no extra input is needed on a live installation - `-gmsaAccountName` only needs to be passed
+  explicitly to override auto-discovery or to check a host before Saga is installed. The
+  `GMSA ACCOUNT` section always appears: when an account name is available (given or
+  auto-discovered) it's passed straight through to Winspect's own gMSA validation, reporting the
+  account name and whether it validates successfully; when none is configured, it reads
+  `Account name: None`.
 - **Saga license info:** customer ID, activation/expiration dates, user/document capacity, and
   licensed features - queried directly from the licensing container's own API. Only currently-valid
   licenses count towards capacity and features (an installation can hold more than one - e.g. a
@@ -204,7 +209,7 @@ by hand.
 | `-monitoringPeriodMinutes` | number | `2` | Passed straight through to Winspect: minutes of CPU/memory samples to average over for RESOURCE USAGE. |
 | `-monitoringSamplingInSeconds` | int | `10` | Passed straight through to Winspect: seconds between each sample. Set to `0` to skip monitoring and fall back to a single instantaneous reading. |
 | `-certificateFilePath` | path | auto-discovered | Path to the Saga gateway certificate file; only needed to override auto-discovery, e.g. when checking a host before Saga is installed. Setting this skips the live HTTPS check entirely (no gateway hostname is resolved). |
-| `-gmsaAccountName` | account name | none | Name of a gMSA to validate, passed straight through to Winspect. Adds a `GMSA ACCOUNT` section when supplied; omitted entirely otherwise. |
+| `-gmsaAccountName` | account name | auto-discovered | Name of a gMSA to validate, passed straight through to Winspect. Only needed to override auto-discovery (from `AYFIE_SAGA_AD_SERVICE_ACCOUNT` in the running installation's `.env`) or when checking a host before Saga is installed. The `GMSA ACCOUNT` section always appears - with the name and validation status when one is available (given or auto-discovered), or `None` when it isn't. |
 | `-winspectPath` | path | auto-detected | Path to Winspect's entry script; only needed if it's not where AyfieInspector expects it. |
 
 ## Sample output

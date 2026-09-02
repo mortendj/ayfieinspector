@@ -75,6 +75,32 @@ Describe "Get-DotEnvValue" {
     }
 }
 
+Describe "Get-ResolvedGmsaAccountName" {
+    It "returns the explicitly passed account name unchanged, without touching the install dir" {
+        Get-ResolvedGmsaAccountName "domain\explicit-account" "C:\Saga" | Should -Be "domain\explicit-account"
+    }
+
+    It "auto-discovers the account name from docker/.env when none was explicitly passed" {
+        $installDirPath = Join-Path $TestDrive "auto-discover"
+        New-Item -ItemType Directory -Path (Join-Path $installDirPath "docker") -Force | Out-Null
+        Set-Content -Path (Join-Path $installDirPath "docker/.env") -Value @("AYFIE_SAGA_AD_SERVICE_ACCOUNT=SWECO\msvc_swecosok$")
+
+        Get-ResolvedGmsaAccountName "" $installDirPath | Should -Be "SWECO\msvc_swecosok$"
+    }
+
+    It "returns an empty string when nothing was passed and there's no install dir to auto-discover from" {
+        Get-ResolvedGmsaAccountName "" "" | Should -Be ""
+    }
+
+    It "returns an empty string when auto-discovery finds no matching key" {
+        $installDirPath = Join-Path $TestDrive "no-key"
+        New-Item -ItemType Directory -Path (Join-Path $installDirPath "docker") -Force | Out-Null
+        Set-Content -Path (Join-Path $installDirPath "docker/.env") -Value @("SOME_OTHER_KEY=ignored")
+
+        Get-ResolvedGmsaAccountName "" $installDirPath | Should -Be ""
+    }
+}
+
 Describe "Get-CertificateAuthority" {
     It "returns the certificate's Issuer property" {
         $certificate = [pscustomobject]@{ Issuer = "CN=DigiCert Global CA" }

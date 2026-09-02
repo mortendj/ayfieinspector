@@ -326,6 +326,63 @@ function Add-SslCertificateDetailToWinspectReport($winspectReportText, $detailLi
     }
 }
 
+function Add-GmsaAccountSectionToWinspectReport($winspectReportText, $resolvedGmsaAccountName) {
+    Write-FunctionCallLog $PSBoundParameters
+    # Winspect's own GMSA ACCOUNT section only renders when it was given a non-empty account name
+    # (see its own ReportBuilder.ps1 comment) - deliberate there, since a bare Winspect run has no
+    # way to tell "no gMSA configured" apart from "caller just didn't pass one". AyfieInspector's own
+    # Get-ResolvedGmsaAccountName now auto-discovers the account name from docker/.env, which makes
+    # "genuinely no gMSA configured" a common, ordinary result rather than "caller didn't ask" - and
+    # ConfigInspector always shows this section either way ("gMSA account: None"). Morten's call: this
+    # stays entirely on the AyfieInspector side, splicing in the section Winspect chose to omit,
+    # rather than changing Winspect's own opt-in behavior (which other, non-Saga callers of Winspect
+    # may still want). When $resolvedGmsaAccountName is non-empty, Winspect already rendered the full
+    # section itself - nothing to do here.
+    if ($resolvedGmsaAccountName -ne "") {
+        Write-ReturnValue $winspectReportText
+        return
+    }
+    $gmsaLineScriptBlocks = @( { "Account name" + $FIELD_LABEL_SEPARATOR + "None" } )
+    $gmsaSectionRaw = New-SectionOutput "GMSA ACCOUNT" $gmsaLineScriptBlocks
+    # Same trailing-blank-line trim as Add-ExpirationsSectionToWinspectReport - New-SectionOutput's
+    # own closing blank line is already baked into $gmsaSectionRaw, so splitting it back into lines
+    # produces more than one trailing empty element; trimmed to exactly one so the splice reproduces
+    # a single blank line, not two.
+    $gmsaSectionFormatted = (Complete-Report $gmsaSectionRaw) -join $PHYSICAL_NEWLINE
+    $gmsaSectionLines = @($gmsaSectionFormatted -split $PHYSICAL_NEWLINE)
+    while (($gmsaSectionLines.Count -gt 0) -and ($gmsaSectionLines[-1] -eq "")) {
+        $gmsaSectionLines = $gmsaSectionLines[0..($gmsaSectionLines.Count - 2)]
+    }
+    $gmsaSectionLines += ""
+
+    # Spliced in right where Winspect's own GMSA ACCOUNT section would land if it rendered one - the
+    # first blank line after RESOURCE USAGE's content (RESOURCE USAGE is always the section
+    # immediately before GMSA ACCOUNT in Winspect's own section order).
+    $resourceUsageHeaderLine = Get-SectionHeader "RESOURCE USAGE"
+    $lines = @($winspectReportText -split $PHYSICAL_NEWLINE)
+    $resourceUsageHeaderIndex = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -eq $resourceUsageHeaderLine) {
+            $resourceUsageHeaderIndex = $i
+            break
+        }
+    }
+    if ($resourceUsageHeaderIndex -eq -1) {
+        Write-WarningLog "Could not find Winspect's RESOURCE USAGE section header to splice the GMSA ACCOUNT section after"
+        Write-ReturnValue $winspectReportText
+    } else {
+        $contentEndIndex = $resourceUsageHeaderIndex + 1
+        while (($contentEndIndex -lt $lines.Count) -and ($lines[$contentEndIndex].Trim() -ne "")) {
+            $contentEndIndex++
+        }
+        $insertIndex = $contentEndIndex + 1
+        $linesBefore = $lines[0..$contentEndIndex]
+        $linesAfter = if ($insertIndex -lt $lines.Count) { $lines[$insertIndex..($lines.Count - 1)] } else { @() }
+        $newLines = $linesBefore + $gmsaSectionLines + $linesAfter
+        Write-ReturnValue ($newLines -join $PHYSICAL_NEWLINE)
+    }
+}
+
 function Get-ExpirationsAndCapacityDepletionsReportSection($licenseSummary, $certificateFilePath) {
     # Both days-left figures resolved fresh here rather than reused from elsewhere. The SSL
     # certificate one only needs a local file read (unlike SAGA CERTIFICATE's live HTTPS check,
@@ -787,6 +844,8 @@ function Start-AyfieInspector() {
         Write-Warning "Could not resolve the Saga gateway certificate info: $_"
     }
 
+    $resolvedGmsaAccountName = Get-ResolvedGmsaAccountName $gmsaAccountName $resolvedInstallDirPath
+
     Write-Host "Resolving the Saga license info..."
     # Resolved once, here, rather than inside Get-SagaLicenseInfoReportSection itself -
     # Add-CustomerNameToReportInfo (right below) and Get-ExpirationsAndCapacityDepletionsReportSection
@@ -804,7 +863,7 @@ function Start-AyfieInspector() {
     }
 
     Write-Host "Running Winspect ($winspectPath) for generic host facts..."
-    $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel -certificateFilePath $resolvedCertificateFilePath -certificateHostname $resolvedCertificateHostname -certificateSectionLabel "SAGA SSL CERTIFICATE INFO" -gmsaAccountName $gmsaAccountName -monitoringPeriodMinutes $monitoringPeriodMinutes -monitoringSamplingInSeconds $monitoringSamplingInSeconds
+    $winspectReportLines = & $winspectPath -outputFormat $outputFormat -outputDestination terminal -logLevel $logLevel -certificateFilePath $resolvedCertificateFilePath -certificateHostname $resolvedCertificateHostname -certificateSectionLabel "SAGA SSL CERTIFICATE INFO" -gmsaAccountName $resolvedGmsaAccountName -monitoringPeriodMinutes $monitoringPeriodMinutes -monitoringSamplingInSeconds $monitoringSamplingInSeconds
     $winspectReportText = $winspectReportLines -join $PHYSICAL_NEWLINE
     $winspectReportText = Add-AyfieInspectorVersionToReportInfo $winspectReportText
     $winspectReportText = Add-CustomerNameToReportInfo $winspectReportText $resolvedLicenseSummary.CustomerName
@@ -812,6 +871,7 @@ function Start-AyfieInspector() {
     $winspectReportText = Add-ExpirationsSectionToWinspectReport $winspectReportText $expirationsSectionRaw
     $sslCertificateDetailLines = Get-SslCertificateDetailLines $resolvedCertificateFilePath
     $winspectReportText = Add-SslCertificateDetailToWinspectReport $winspectReportText $sslCertificateDetailLines
+    $winspectReportText = Add-GmsaAccountSectionToWinspectReport $winspectReportText $resolvedGmsaAccountName
 
     if ($logLevel -ne "off") {
         # Winspect's own Get-LogFilePath names its log after Winspect's own script path - now that

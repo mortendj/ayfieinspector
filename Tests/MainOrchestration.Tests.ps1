@@ -155,6 +155,62 @@ Describe "Add-SslCertificateDetailToWinspectReport" {
     }
 }
 
+Describe "Add-GmsaAccountSectionToWinspectReport" {
+    # Winspect's own GMSA ACCOUNT section only renders when given a non-empty account name - so a
+    # host with no gMSA configured (the common case once Get-ResolvedGmsaAccountName auto-discovers
+    # from docker/.env instead of requiring an explicit CLI flag) got no section at all, while
+    # ConfigInspector always shows "gMSA account: None". Confirmed as a real gap on a production run
+    # (KTH, 2026-09-02) - Winspect itself doesn't need to change (Morten's call), so this splices the
+    # missing section in on the AyfieInspector side instead.
+    It "inserts a GMSA ACCOUNT section reading 'Account name: None' right after RESOURCE USAGE when no account was resolved" {
+        $resourceUsageHeader = Get-SectionHeader "RESOURCE USAGE"
+        $winspectReportText = @(
+            $resourceUsageHeader,
+            "Current CPU load${FIELD_LABEL_SEPARATOR}2 %",
+            "Current RAM usage${FIELD_LABEL_SEPARATOR}39 %",
+            "",
+            "#################### FIREWALL OPENINGS #####################",
+            "Reachable sites: none"
+        ) -join $PHYSICAL_NEWLINE
+
+        $result = Add-GmsaAccountSectionToWinspectReport $winspectReportText ""
+        $resultLines = @($result -split $PHYSICAL_NEWLINE)
+
+        $gmsaHeaderIndex = [array]::IndexOf($resultLines, (Get-SectionHeader "GMSA ACCOUNT"))
+        $firewallHeaderIndex = [array]::IndexOf($resultLines, "#################### FIREWALL OPENINGS #####################")
+        $gmsaHeaderIndex | Should -BeGreaterThan -1
+        $gmsaHeaderIndex | Should -BeLessThan $firewallHeaderIndex
+        $resultLines | Should -Contain "Account name${FIELD_LABEL_SEPARATOR}None"
+        $resultLines[$gmsaHeaderIndex + 2] | Should -Be ""
+    }
+
+    It "returns the text unchanged when an account name was resolved - Winspect already rendered its own section" {
+        $winspectReportText = @(
+            (Get-SectionHeader "RESOURCE USAGE"),
+            "Current CPU load${FIELD_LABEL_SEPARATOR}2 %",
+            "",
+            (Get-SectionHeader "GMSA ACCOUNT"),
+            "Account name${FIELD_LABEL_SEPARATOR}SWECO\msvc_swecosok$",
+            "Status${FIELD_LABEL_SEPARATOR}OK"
+        ) -join $PHYSICAL_NEWLINE
+
+        $result = Add-GmsaAccountSectionToWinspectReport $winspectReportText "SWECO\msvc_swecosok$"
+
+        $result | Should -Be $winspectReportText
+    }
+
+    It "returns the original text unchanged if Winspect's RESOURCE USAGE section header can't be found" {
+        $winspectReportText = @(
+            "####################### REPORT INFO ########################",
+            "Local time: 2026-09-02 12:00:00"
+        ) -join $PHYSICAL_NEWLINE
+
+        $result = Add-GmsaAccountSectionToWinspectReport $winspectReportText ""
+
+        $result | Should -Be $winspectReportText
+    }
+}
+
 Describe "Add-ExpirationsSectionToWinspectReport" {
     It "inserts the EXPIRATIONS section directly before Winspect's own CERTIFICATES header, as the report's 2nd block" {
         # Regression test: this section used to only ever appear after all of Winspect's own

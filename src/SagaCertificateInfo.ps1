@@ -99,3 +99,25 @@ function Get-SagaGatewayCertificateInfo($certificateFilePathOverride) {
     }
     Write-ReturnValue $certificateInfo
 }
+
+function Get-ResolvedGmsaAccountName($gmsaAccountName, $installDirPath) {
+    Write-FunctionCallLog $PSBoundParameters
+    # Auto-discovered from docker/.env the same way the gateway certificate/hostname already are -
+    # ConfigInspector does this too (its own Get-GmsaAccountName reads the same
+    # AYFIE_SAGA_AD_SERVICE_ACCOUNT key) rather than requiring a caller to pass it explicitly every
+    # time. An explicit override always wins; so does the pre-installation case (no install dir yet
+    # to auto-discover from, $installDirPath is "").
+    $resolvedGmsaAccountName = $gmsaAccountName
+    if (($resolvedGmsaAccountName -eq "") -and ($installDirPath -ne "")) {
+        try {
+            $dotEnvFilePath = Join-Path $installDirPath $DOT_ENV_RELATIVE_PATH
+            $autoDiscoveredGmsaAccountName = Get-DotEnvValue $dotEnvFilePath $AD_SERVICE_ACCOUNT_KEY
+            if ($null -ne $autoDiscoveredGmsaAccountName) {
+                $resolvedGmsaAccountName = $autoDiscoveredGmsaAccountName
+            }
+        } catch {
+            Write-Warning "Could not auto-discover the gMSA account name: $_"
+        }
+    }
+    Write-ReturnValue $resolvedGmsaAccountName
+}
