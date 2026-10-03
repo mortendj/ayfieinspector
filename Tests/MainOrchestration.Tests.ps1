@@ -113,6 +113,33 @@ Describe "Get-SslCertificateDetailLines" {
         $result | Should -Contain "Certificate authority${FIELD_LABEL_SEPARATOR}CN=DigiCert Global CA"
         $result | Should -Contain "Private key${FIELD_LABEL_SEPARATOR}Unavailable"
     }
+
+    It "appends a warning to Subject Alternative Names when the gateway hostname is given and missing from it" {
+        # Delegates the actual comparison to Winspect's own Get-SubjectAlternativeNameMismatchText
+        # (already dot-sourced) rather than re-implementing it here - this just confirms the result
+        # gets appended to the right field when a hostname was resolved.
+        Mock Get-CertificateFromFile { [pscustomobject]@{ Issuer = "CN=DigiCert Global CA"; NotAfter = [datetime]"2026-10-24" } }
+        Mock Get-CertificateAuthority { "CN=DigiCert Global CA" }
+        Mock Get-CertificateSubjectAlternativeNames { "gw01, example.com" }
+        Mock Get-CertificateKeyEncryptionStatus { "Encrypted" }
+        Mock Get-SubjectAlternativeNameMismatchText { "hostname 'gw01.example.com' NOT found in Subject Alternative Names (gw01, example.com)" }
+
+        $result = Get-SslCertificateDetailLines "C:\Saga\volumes\Traefik\certs\gateway.crt" "gw01.example.com"
+
+        $result | Should -Contain "Subject alternative names${FIELD_LABEL_SEPARATOR}gw01, example.com - hostname 'gw01.example.com' NOT found in Subject Alternative Names (gw01, example.com)"
+    }
+
+    It "leaves Subject Alternative Names unchanged when no gateway hostname is known (the pre-installation case)" {
+        Mock Get-CertificateFromFile { [pscustomobject]@{ Issuer = "CN=DigiCert Global CA"; NotAfter = [datetime]"2026-10-24" } }
+        Mock Get-CertificateAuthority { "CN=DigiCert Global CA" }
+        Mock Get-CertificateSubjectAlternativeNames { "search.example.com" }
+        Mock Get-CertificateKeyEncryptionStatus { "Encrypted" }
+        Mock Get-SubjectAlternativeNameMismatchText { throw "should not be called" }
+
+        $result = Get-SslCertificateDetailLines "C:\Saga\volumes\Traefik\certs\gateway.crt"
+
+        $result | Should -Contain "Subject alternative names${FIELD_LABEL_SEPARATOR}search.example.com"
+    }
 }
 
 Describe "Add-SslCertificateDetailToWinspectReport" {

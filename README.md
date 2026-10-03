@@ -8,11 +8,11 @@ customizations, search refiners, the scheduled restart task, outbound connectivi
 gateway certificate — without having to piece it together from several different admin surfaces
 by hand.
 
-> **Status:** v1.1.0. The current release covers the rule engine,
+> **Status:** v1.2.0. The current release covers the rule engine,
 > custom refiners, Solr info (document count, index languages/memory/stack size/index size), the
 > scheduled restart task, an outbound firewall connectivity check, the Saga gateway/SSL certificate
-> (live-vs-file issuer comparison plus authority/expiration/SANs/private-key detail, all in one
-> section), the authentication method (identity provider/user federation, plus a local-account and
+> (live-vs-file issuer comparison plus authority/expiration/SANs-vs-gateway-hostname/private-key
+> detail, all in one section), the authentication method (identity provider/user federation, plus a local-account and
 > per-connector security-source check when neither is configured), AD/Azure AD data source syncing,
 > database info, backups, Docker images currently in use, a gMSA account check,
 > installation info (install directory, Saga version, branding, gateway hostname, OS support
@@ -148,7 +148,13 @@ by hand.
   (`Encrypted`, `Unencrypted`, or - since it isn't easily determined from the PEM header alone - a
   distinct "RSA key" case), read from the certificate file itself (the private key only ever exists
   on disk, never over the live HTTPS check) - one section for the certificate rather than two, since
-  both halves are about the exact same file.
+  both halves are about the exact same file. When the gateway hostname is known, it's also checked
+  against the certificate's own Subject Alternative Names - a certificate can be unexpired and
+  correctly issued and still fail every real TLS handshake if that hostname was never added as a
+  SAN entry, confirmed on a real production host where a self-signed certificate had the bare
+  hostname and bare domain as separate SAN entries but never the one combined FQDN actually
+  configured as the gateway hostname. Stays silent when the hostname is found, same as the
+  issuer-comparison check above.
 - **Generic host facts:** everything Winspect itself reports — host identity, network adapters,
   CPU/RAM/disk capacity and usage, and certificate expirations — included in the same combined
   report, with an `AyfieInspector version` line added next to Winspect's own version line so a

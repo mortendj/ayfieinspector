@@ -239,7 +239,7 @@ function Get-SagaLicenseInfoReportSection($licenseSummary) {
     return New-SectionOutput "SAGA LICENSE INFO" $lineScriptBlocks
 }
 
-function Get-SslCertificateDetailLines($certificateFilePath) {
+function Get-SslCertificateDetailLines($certificateFilePath, $certificateHostname = "") {
     Write-FunctionCallLog $PSBoundParameters
     # Resolves just the fields Winspect's own SAGA SSL CERTIFICATE INFO section can't show, since it
     # never hands the resolved certificate object back to its caller - authority, expiration,
@@ -272,6 +272,16 @@ function Get-SslCertificateDetailLines($certificateFilePath) {
             $expirationDate = $certificate.NotAfter.ToString("yyyy-MM-dd")
             try {
                 $subjectAlternativeNames = Get-CertificateSubjectAlternativeNames $certificate
+                # Reuses Winspect's own Get-SubjectAlternativeNameMismatchText (Certificates.ps1,
+                # already dot-sourced) rather than re-implementing the same comparison here - stays
+                # silent on a match, same terse-on-the-happy-path convention as everywhere else in
+                # this merged section.
+                if ($certificateHostname -ne "") {
+                    $mismatchText = Get-SubjectAlternativeNameMismatchText $certificate $certificateHostname
+                    if ($mismatchText -ne "") {
+                        $subjectAlternativeNames += " - $mismatchText"
+                    }
+                }
             } catch {
                 Write-Warning "Failed to determine the certificate's subject alternative names: $_"
             }
@@ -869,7 +879,7 @@ function Start-AyfieInspector() {
     $winspectReportText = Add-CustomerNameToReportInfo $winspectReportText $resolvedLicenseSummary.CustomerName
     $expirationsSectionRaw = Get-ExpirationsAndCapacityDepletionsReportSection $resolvedLicenseSummary $resolvedCertificateFilePath
     $winspectReportText = Add-ExpirationsSectionToWinspectReport $winspectReportText $expirationsSectionRaw
-    $sslCertificateDetailLines = Get-SslCertificateDetailLines $resolvedCertificateFilePath
+    $sslCertificateDetailLines = Get-SslCertificateDetailLines $resolvedCertificateFilePath $resolvedCertificateHostname
     $winspectReportText = Add-SslCertificateDetailToWinspectReport $winspectReportText $sslCertificateDetailLines
     $winspectReportText = Add-GmsaAccountSectionToWinspectReport $winspectReportText $resolvedGmsaAccountName
 
