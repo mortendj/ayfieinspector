@@ -62,7 +62,7 @@ $IDENTITY_PROVIDER_AUTH_METHOD_NAME = "Entra ID"
 $USER_FEDERATION_AUTH_METHOD_NAME   = "Active Directory"
 # Local, realm-native Keycloak accounts (created directly in the realm, not synced from anywhere)
 # are a third way to authenticate that neither identity_provider nor component covers - confirmed on
-# a real KTH host where API access kept working via exactly such an account while this section
+# a real production host where API access kept working via exactly such an account while this section
 # reported zero of the two supported mechanisms configured. federation_link IS NULL excludes users
 # synced in by a user-storage/federation provider; service_account_client_link IS NULL excludes
 # Keycloak's own auto-created per-client service-account users, neither of which is a human/API
@@ -73,7 +73,7 @@ $USER_ENTITY_TABLE                  = "public.user_entity"
 # provisions (KEYCLOAK_USER=saga_admin in index's deploy/saga/docker/TEMPLATE-.env, the baseline
 # every install derives its .env from), not something customer-specific. It exists purely to log
 # into Keycloak's own admin console, never the actual application, so it must not count toward
-# "local accounts that might explain application access" - confirmed by Morten on a real KTH host.
+# "local accounts that might explain application access" - confirmed by Morten on a real production host.
 $SAGA_ADMIN_USERNAME                = "saga_admin"
 $LOCAL_USER_WHERE_CLAUSE            = "federation_link IS NULL AND service_account_client_link IS NULL AND username != '$SAGA_ADMIN_USERNAME'"
 

@@ -128,8 +128,8 @@ by hand.
   a fixed field list.
 - **Database connector configurations:** the raw `ConnectorDefinition.xml` content for every
   connector under `volumes\Connector` that has one, rendered as-is (never re-parsed as anything
-  other than report text) - a real production crash (NGI's Tidemann connector, whose definition
-  contained a double quote) in the older tool this is ported from came from wrapping that same raw
+  other than report text) - a real production crash (a customer's custom database connector, whose
+  definition contained a double quote) in the older tool this is ported from came from wrapping that same raw
   XML in a string and evaluating it as PowerShell source, which this project's plain scriptblock
   report sections never do in the first place.
 - **Saga SSL certificate info:** identifies and reports on the actual Ayfie/Saga gateway
@@ -343,9 +343,9 @@ NetData (fileserver)
         FilenameFilterMode=2
 
 ############ DATABASE CONNECTOR CONFIGURATIONS #############
-Connector: Tidemann
+Connector: SampleDb
 <ConnectorDefinition>
-  <ConnectionString>Server=dbserver.example.com;Database=Tidemann;</ConnectionString>
+  <ConnectionString>Server=dbserver.example.com;Database=SampleDb;</ConnectionString>
 </ConnectorDefinition>
 
 #################### CUSTOM INDEX RULES ####################

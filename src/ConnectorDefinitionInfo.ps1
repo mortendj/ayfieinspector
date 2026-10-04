@@ -32,7 +32,7 @@ function Test-HasRestrictedSecuritySource($installDirPath) {
     Write-FunctionCallLog $PSBoundParameters
     # Used by Get-AuthenticationMethodSummary to say something concrete about whether a Keycloak
     # local account (or any other authenticated session) can actually see restricted data, rather
-    # than just noting the account exists - confirmed on a real KTH host where a connector's
+    # than just noting the account exists - confirmed on a real production host where a connector's
     # SecuritySources granted every document to $EVERYONE_SID, so any authenticated session saw
     # everything regardless of identity. A missing SecuritySources block counts the same as
     # everything-is-Everyone (no restriction found), not as its own separate case.

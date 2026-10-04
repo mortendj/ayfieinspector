@@ -84,7 +84,7 @@ Describe "Get-LocalUserAccountCount" {
         # application authentication is configured (it's Keycloak's own console-admin bootstrap
         # account, provisioned by Saga's deployment itself - KEYCLOAK_USER=saga_admin in every
         # install's .env) - counting it toward "local accounts that might explain application
-        # access" is misleading, confirmed by Morten on a real KTH host.
+        # access" is misleading, confirmed by Morten on a real production host.
         $script:capturedArgs = $null
         Mock Invoke-ExternalCommand {
             param($commandName, $commandArgs)
@@ -114,7 +114,7 @@ Describe "Get-AuthenticationMethodSummary" {
     }
 
     It "states plainly when local accounts exist but no restricted security source was found" {
-        # Regression case: a real KTH host had zero identity providers and zero user federation
+        # Regression case: a real production host had zero identity providers and zero user federation
         # providers configured, yet API access kept working via a locally-created Keycloak account
         # (confirmed via its "source: local" attribute in the admin console) - this section used to
         # report "Not configured" with nothing explaining why access still worked. An earlier version

@@ -83,9 +83,9 @@ Describe "Get-ResolvedGmsaAccountName" {
     It "auto-discovers the account name from docker/.env when none was explicitly passed" {
         $installDirPath = Join-Path $TestDrive "auto-discover"
         New-Item -ItemType Directory -Path (Join-Path $installDirPath "docker") -Force | Out-Null
-        Set-Content -Path (Join-Path $installDirPath "docker/.env") -Value @("AYFIE_SAGA_AD_SERVICE_ACCOUNT=SWECO\msvc_swecosok$")
+        Set-Content -Path (Join-Path $installDirPath "docker/.env") -Value @("AYFIE_SAGA_AD_SERVICE_ACCOUNT=CONTOSO\svc-saga$")
 
-        Get-ResolvedGmsaAccountName "" $installDirPath | Should -Be "SWECO\msvc_swecosok$"
+        Get-ResolvedGmsaAccountName "" $installDirPath | Should -Be "CONTOSO\svc-saga$"
     }
 
     It "returns an empty string when nothing was passed and there's no install dir to auto-discover from" {

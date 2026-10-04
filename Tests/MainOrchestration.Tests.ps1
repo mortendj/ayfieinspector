@@ -75,9 +75,9 @@ Describe "Get-SslCertificateDetailLines" {
         Mock Get-CertificateSubjectAlternativeNames { "search.example.com" }
         Mock Get-CertificateKeyEncryptionStatus { "Encrypted" }
 
-        $result = Get-SslCertificateDetailLines "C:\Saga\volumes\Traefik\certs\kth-search-prod.sys.kth.se.crt"
+        $result = Get-SslCertificateDetailLines "C:\Saga\volumes\Traefik\certs\search-prod.contoso.local.crt"
 
-        $result | Should -Contain "Certificate file${FIELD_LABEL_SEPARATOR}kth-search-prod.sys.kth.se.crt"
+        $result | Should -Contain "Certificate file${FIELD_LABEL_SEPARATOR}search-prod.contoso.local.crt"
     }
 
     It "reports every field as 'Unavailable' when no certificate file path is known" {
@@ -151,10 +151,10 @@ Describe "Add-SslCertificateDetailToWinspectReport" {
         $sagaCertHeader = Get-SectionHeader "SAGA SSL CERTIFICATE INFO"
         $winspectReportText = @(
             $sagaCertHeader,
-            "kth-search-prod.sys.kth.se -> expires 2026-10-24 (54 days) - checked live via HTTPS (issuer matches the certificate file)",
+            "search-prod.contoso.local -> expires 2026-10-24 (54 days) - checked live via HTTPS (issuer matches the certificate file)",
             "",
             "###################### HOST IDENTITY #######################",
-            "Hostname: kth-search-prod"
+            "Hostname: search-prod"
         ) -join $PHYSICAL_NEWLINE
 
         $result = Add-SslCertificateDetailToWinspectReport $winspectReportText @("Certificate file: gateway.crt", "Private key: Unencrypted")
@@ -217,11 +217,11 @@ Describe "Add-GmsaAccountSectionToWinspectReport" {
             "Current CPU load${FIELD_LABEL_SEPARATOR}2 %",
             "",
             (Get-SectionHeader "GMSA ACCOUNT"),
-            "Account name${FIELD_LABEL_SEPARATOR}SWECO\msvc_swecosok$",
+            "Account name${FIELD_LABEL_SEPARATOR}CONTOSO\svc-saga$",
             "Status${FIELD_LABEL_SEPARATOR}OK"
         ) -join $PHYSICAL_NEWLINE
 
-        $result = Add-GmsaAccountSectionToWinspectReport $winspectReportText "SWECO\msvc_swecosok$"
+        $result = Add-GmsaAccountSectionToWinspectReport $winspectReportText "CONTOSO\svc-saga$"
 
         $result | Should -Be $winspectReportText
     }
@@ -280,14 +280,14 @@ Describe "Add-ExpirationsSectionToWinspectReport" {
 
 Describe "Add-AyfieInspectorVersionToReportInfo" {
     # Regression test: the combined report only ever showed which Winspect version produced it,
-    # never which AyfieInspector version - confirmed as a real gap on a production run (KTH,
-    # 2026-08-26), since the Ayfie-specific sections below REPORT INFO have no other attribution.
+    # never which AyfieInspector version - confirmed as a real gap on a production run
+    # (2026-08-26), since the Ayfie-specific sections below REPORT INFO have no other attribution.
 
     It "inserts an AyfieInspector version line directly after Winspect's own Winspect version line" {
         $winspectReportText = @(
             "####################### REPORT INFO ########################",
             "Local time: 2026-08-26 17:16:02",
-            "User: kth-search-prod\prod-ayfie-admin",
+            "User: search-prod\prod-ayfie-admin",
             "Winspect version: 0.10.0 (2026-08-26)",
             "Running elevated: Yes"
         ) -join $PHYSICAL_NEWLINE
@@ -609,12 +609,12 @@ Describe "Get-DataSourceConnectionsReportSection" {
 
 Describe "Get-DatabaseConnectorConfigurationsReportSection" {
     It "includes the connector definition summary under a DATABASE CONNECTOR CONFIGURATIONS heading" {
-        Mock Get-ConnectorDefinitionSummary { "Connector: Tidemann`n<page name=`"Database`"></page>" }
+        Mock Get-ConnectorDefinitionSummary { "Connector: SampleDb`n<page name=`"Database`"></page>" }
 
         $result = Get-DatabaseConnectorConfigurationsReportSection "C:\Saga\"
 
         $result | Should -Match "DATABASE CONNECTOR CONFIGURATIONS"
-        $result | Should -Match "Connector: Tidemann"
+        $result | Should -Match "Connector: SampleDb"
     }
 
     It "reports 'Unavailable' when the install directory couldn't be resolved" {
@@ -970,7 +970,7 @@ Describe "Add-CustomerNameToReportInfo" {
         $winspectReportText = @(
             "####################### REPORT INFO ########################",
             "Local time: 2026-08-28 17:16:02",
-            "User: kth-search-prod\prod-ayfie-admin"
+            "User: search-prod\prod-ayfie-admin"
         ) -join $PHYSICAL_NEWLINE
 
         $result = Add-CustomerNameToReportInfo $winspectReportText "Acme Corp"

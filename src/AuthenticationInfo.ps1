@@ -41,8 +41,8 @@ function Get-AuthenticationMethodSummary($installDirPath) {
         # just an in-progress installation.
         $summary = "Not configured (0 identity providers, 0 user federation providers)"
         # Neither supported mechanism is configured, but that doesn't mean nobody can authenticate -
-        # see the $USER_ENTITY_TABLE comment in Constants.ps1. Confirmed on a real KTH host: API
-        # access kept working via a local Keycloak account while this section showed zero of the two
+        # see the $USER_ENTITY_TABLE comment in Constants.ps1. Confirmed on a real production host:
+        # API access kept working via a local Keycloak account while this section showed zero of the two
         # supported mechanisms. Whether that matters depends on whether the account can actually see
         # restricted data - Test-HasRestrictedSecuritySource answers that concretely instead of just
         # flagging the account and leaving it as homework.

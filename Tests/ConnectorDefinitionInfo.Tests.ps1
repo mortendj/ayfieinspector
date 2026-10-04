@@ -33,17 +33,18 @@ Describe "Get-ConnectorDefinitionSummary" {
     }
 
     It "includes the connector's directory name and its raw definition XML, quotes and all" {
-        # Regression coverage for the real production crash this is ported from (NGI's Tidemann
-        # connector): a definition file containing a double quote (e.g. <page name="Database">)
-        # must survive completely unescaped and unmodified, since this project's report sections
-        # never re-parse a rendered value as PowerShell source in the first place.
+        # Regression coverage for a real production crash this is ported from (a customer's own
+        # custom database connector): a definition file containing a double quote
+        # (e.g. <page name="Database">) must survive completely unescaped and unmodified, since this
+        # project's report sections never re-parse a rendered value as PowerShell source in the
+        # first place.
         $installDirPath = Join-Path $TestDrive "saga-install-one-connector"
-        New-TestConnectorDefinition $installDirPath "Tidemann" '<page name="Database"><setting key="x" value="y" /></page>'
+        New-TestConnectorDefinition $installDirPath "SampleDb" '<page name="Database"><setting key="x" value="y" /></page>'
 
         $result = Get-ConnectorDefinitionSummary $installDirPath
         $escapedXml = [regex]::Escape('<page name="Database"><setting key="x" value="y" /></page>')
 
-        $result | Should -Match "Connector: Tidemann"
+        $result | Should -Match "Connector: SampleDb"
         $result | Should -Match $escapedXml
     }
 
@@ -64,7 +65,7 @@ Describe "Get-ConnectorDefinitionSummary" {
 Describe "Test-HasRestrictedSecuritySource" {
     # Used by Get-AuthenticationMethodSummary to say something concrete about whether an
     # authenticated session (e.g. a local Keycloak account) can actually see restricted data -
-    # confirmed on a real KTH host where a connector granted every document to S-1-1-0 ("Everyone").
+    # confirmed on a real production host where a connector granted every document to S-1-1-0 ("Everyone").
 
     It "reports false when every SID found is Everyone (S-1-1-0)" {
         $installDirPath = Join-Path $TestDrive "saga-install-everyone-only"
