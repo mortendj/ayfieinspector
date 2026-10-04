@@ -287,7 +287,7 @@ Describe "Add-AyfieInspectorVersionToReportInfo" {
         $winspectReportText = @(
             "####################### REPORT INFO ########################",
             "Local time: 2026-08-26 17:16:02",
-            "User: search-prod\prod-ayfie-admin",
+            "User: search-prod\svc-ayfie-admin",
             "Winspect version: 0.10.0 (2026-08-26)",
             "Running elevated: Yes"
         ) -join $PHYSICAL_NEWLINE
@@ -970,7 +970,7 @@ Describe "Add-CustomerNameToReportInfo" {
         $winspectReportText = @(
             "####################### REPORT INFO ########################",
             "Local time: 2026-08-28 17:16:02",
-            "User: search-prod\prod-ayfie-admin"
+            "User: search-prod\svc-ayfie-admin"
         ) -join $PHYSICAL_NEWLINE
 
         $result = Add-CustomerNameToReportInfo $winspectReportText "Acme Corp"
