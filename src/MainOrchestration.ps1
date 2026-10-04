@@ -343,7 +343,7 @@ function Add-GmsaAccountSectionToWinspectReport($winspectReportText, $resolvedGm
     # way to tell "no gMSA configured" apart from "caller just didn't pass one". AyfieInspector's own
     # Get-ResolvedGmsaAccountName now auto-discovers the account name from docker/.env, which makes
     # "genuinely no gMSA configured" a common, ordinary result rather than "caller didn't ask" - and
-    # ConfigInspector always shows this section either way ("gMSA account: None"). Morten's call: this
+    # prior tooling always showed this section either way ("gMSA account: None"). Morten's call: this
     # stays entirely on the AyfieInspector side, splicing in the section Winspect chose to omit,
     # rather than changing Winspect's own opt-in behavior (which other, non-Saga callers of Winspect
     # may still want). When $resolvedGmsaAccountName is non-empty, Winspect already rendered the full
@@ -469,7 +469,7 @@ function Add-ExpirationsSectionToWinspectReport($winspectReportText, $expiration
     Write-FunctionCallLog $PSBoundParameters
     # Spliced in right before Winspect's own CERTIFICATES section - the first section after REPORT
     # INFO - so EXPIRATIONS AND CAPACITY DEPLETIONS lands as the report's 2nd block overall, matching
-    # ConfigInspector's own position for it (Morten's call: it belongs there, not appended after all
+    # prior tooling's own position for it (Morten's call: it belongs there, not appended after all
     # of Winspect's own sections like the rest of AyfieInspector's new sections). Same established
     # text-surgery pattern as Add-CustomerNameToReportInfo/Add-AyfieInspectorVersionToReportInfo
     # above - matched by exact equality against Get-SectionHeader's own reconstruction (not a
@@ -598,7 +598,7 @@ function Get-PersonalAssistantReportSection($installDirPath) {
     )
     # Model deployment fields were stripped out of docker/.env by the Saga 6->7 upgrade script -
     # see the note on $PA_MODEL_FIELDS_DROPPED_FROM_SAGA_MAJOR_VERSION (Constants.ps1) - and matches
-    # ConfigInspector's own major-version gate for this section. Defaults to including the fields
+    # the equivalent major-version gate for this section in prior tooling. Defaults to including the fields
     # (major version 0) when the Saga version itself can't be determined, since showing
     # "Unavailable" values is more informative than silently hiding the whole block.
     $sagaMajorVersion = 0

@@ -18,11 +18,11 @@ function Get-RefinersSummary($refiners) {
         foreach ($refiner in $refiners) {
             $lines = @()
             $lines += "$INDENTATION$($refiner.DisplayName)"
-            # Every property the Dashboard API returns, not a hand-picked subset - matches
-            # ConfigInspector's own CUSTOM REFINERS section (a generic per-property dump via
+            # Every property the Dashboard API returns, not a hand-picked subset - matches prior
+            # tooling's own CUSTOM REFINERS section (a generic per-property dump via
             # Get-ItemAsString), which showed ~20 fields (ParentRefiner, IsHierarchical, Tags,
             # FacetsSortOrder, RangeType, etc.) this used to drop silently. Property order follows
-            # whatever order the API/JSON returned them in, same as ConfigInspector.
+            # whatever order the API/JSON returned them in, same as that equivalent section.
             foreach ($property in $refiner.psobject.Properties) {
                 if ($property.Name -eq "DisplayName") {
                     continue

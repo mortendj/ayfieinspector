@@ -2,7 +2,7 @@ function Get-LingoDataTypeAndLanguage($installDirPath) {
     Write-FunctionCallLog $PSBoundParameters
     # Kept as its own function (not folded into Get-LingoInfo below) since the SUPERVISOR INFO
     # section reuses this exact same value under its own label ("Report engine Lingo
-    # configuration"), matching ConfigInspector's own layout.
+    # configuration"), matching the equivalent layout in prior tooling.
     $dotEnvFilePath = Join-Path $installDirPath $DOT_ENV_RELATIVE_PATH
     $language = Get-DotEnvValue $dotEnvFilePath $LINGO_IMAGE_ID_KEY
     if (-not $language) {

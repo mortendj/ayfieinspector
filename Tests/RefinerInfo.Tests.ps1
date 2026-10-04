@@ -85,8 +85,8 @@ Describe "Get-RefinersSummary" {
     It "includes every property the API returned, not just the hand-picked original subset" {
         # Regression test: this used to hardcode 6 fields, silently dropping everything else the
         # Dashboard API returns (ParentRefiner, IsHierarchical, Tags, FacetsSortOrder, RangeType,
-        # etc.) - confirmed missing versus ConfigInspector's own generic per-property dump during a
-        # real KTH comparison.
+        # etc.) - confirmed missing versus prior tooling's own generic per-property dump during a
+        # real production-host comparison.
         $refiner = [pscustomobject]@{
             RefinerName    = "School"
             DisplayName    = "School"

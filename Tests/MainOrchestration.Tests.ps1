@@ -68,8 +68,8 @@ Describe "Get-SslCertificateDetailLines" {
 
     It "shows only the filename, not the full path, for the certificate file" {
         # Regression test: this used to omit the certificate filename entirely - confirmed missing
-        # versus ConfigInspector's own "Certificate file: <name>.crt" line during a real KTH
-        # comparison. Matches ConfigInspector's own convention of showing just the filename.
+        # during a real production-host comparison against prior tooling's own "Certificate file:
+        # <name>.crt" line. Matches that same established convention of showing just the filename.
         Mock Get-CertificateFromFile { [pscustomobject]@{ Issuer = "CN=DigiCert Global CA"; NotAfter = [datetime]"2026-10-24" } }
         Mock Get-CertificateAuthority { "CN=DigiCert Global CA" }
         Mock Get-CertificateSubjectAlternativeNames { "search.example.com" }
@@ -186,8 +186,8 @@ Describe "Add-GmsaAccountSectionToWinspectReport" {
     # Winspect's own GMSA ACCOUNT section only renders when given a non-empty account name - so a
     # host with no gMSA configured (the common case once Get-ResolvedGmsaAccountName auto-discovers
     # from docker/.env instead of requiring an explicit CLI flag) got no section at all, while
-    # ConfigInspector always shows "gMSA account: None". Confirmed as a real gap on a production run
-    # (KTH, 2026-09-02) - Winspect itself doesn't need to change (Morten's call), so this splices the
+    # prior tooling always shows "gMSA account: None". Confirmed as a real gap on a production run
+    # (2026-09-02) - Winspect itself doesn't need to change (Morten's call), so this splices the
     # missing section in on the AyfieInspector side instead.
     It "inserts a GMSA ACCOUNT section reading 'Account name: None' right after RESOURCE USAGE when no account was resolved" {
         $resourceUsageHeader = Get-SectionHeader "RESOURCE USAGE"
@@ -242,7 +242,7 @@ Describe "Add-ExpirationsSectionToWinspectReport" {
     It "inserts the EXPIRATIONS section directly before Winspect's own CERTIFICATES header, as the report's 2nd block" {
         # Regression test: this section used to only ever appear after all of Winspect's own
         # sections (RESOURCE USAGE etc.) - Morten wanted it as the 2nd block overall, matching
-        # ConfigInspector's own position for it, right after REPORT INFO.
+        # prior tooling's own position for it, right after REPORT INFO.
         $certificatesHeader = Get-SectionHeader "CERTIFICATES"
         $winspectReportText = @(
             "####################### REPORT INFO ########################",
@@ -930,8 +930,8 @@ Describe "Get-ExpirationsAndCapacityDepletionsReportSection" {
     It "includes the Saga license and SSL certificate days-left figures under the section heading" {
         # Regression test: the SSL certificate half used to be left out of this section entirely
         # (the days-left figure was only ever visible tucked inside SAGA CERTIFICATE's one-line
-        # summary) - confirmed missing versus ConfigInspector's own "Days left of SSL certificate"
-        # line, which sits right here, during a real KTH comparison.
+        # summary) - confirmed missing versus prior tooling's own "Days left of SSL certificate"
+        # line, which sits right here, during a real production-host comparison.
         Mock Get-DaysUntilSagaLicenseExpires { 94 }
         # A few minutes' buffer past the 54-day mark, not exactly on it - the function computes its
         # own "now" a moment after this mock's "now", and without a buffer that tiny gap can push

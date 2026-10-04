@@ -176,7 +176,7 @@ $PA_HQ_PLUS_MODEL_NAME_KEY = "AYFIE_CHAT_HQ_PLUS_MODEL_DISPLAY_NAME"
 # Model deployment settings were explicitly stripped from docker/.env by the Saga 6->7 upgrade
 # script (confirmed in index repo's TEMPLATE-upgrade-saga6-to-saga7.ps1, $PA_VARIABLES_TO_REMOVE) -
 # models are configured through the Agent app's own System Settings wizard from Saga 7 onward, not
-# via .env. Matches ConfigInspector's own major-version gate for this section.
+# via .env. Matches the equivalent major-version gate for this section in prior tooling.
 $PA_MODEL_FIELDS_DROPPED_FROM_SAGA_MAJOR_VERSION = 7
 
 ################## LINGO INFO ##################

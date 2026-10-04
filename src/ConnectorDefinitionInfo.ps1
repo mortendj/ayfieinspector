@@ -1,8 +1,8 @@
 function Get-ConnectorDefinitionSummary($installDirPath) {
     Write-FunctionCallLog $PSBoundParameters
     # Rendered directly as raw XML text, never through anything that re-parses it as PowerShell
-    # source - ConfigInspector's own version of this section had a real production crash (NGI) from
-    # exactly that: wrapping already-resolved XML containing a double quote in a string and
+    # source - prior tooling's own version of this section had a real production crash from exactly
+    # that: wrapping already-resolved XML containing a double quote in a string and
     # Invoke-Expression-ing it broke out of the string the moment the XML itself contained one. This
     # project's report sections are plain scriptblocks whose returned text is used as-is, never
     # re-parsed, so that failure mode doesn't apply here - but the raw-text-only approach is kept

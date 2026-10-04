@@ -103,7 +103,7 @@ function Get-SagaGatewayCertificateInfo($certificateFilePathOverride) {
 function Get-ResolvedGmsaAccountName($gmsaAccountName, $installDirPath) {
     Write-FunctionCallLog $PSBoundParameters
     # Auto-discovered from docker/.env the same way the gateway certificate/hostname already are -
-    # ConfigInspector does this too (its own Get-GmsaAccountName reads the same
+    # prior tooling does this too (its own equivalent function reads the same
     # AYFIE_SAGA_AD_SERVICE_ACCOUNT key) rather than requiring a caller to pass it explicitly every
     # time. An explicit override always wins; so does the pre-installation case (no install dir yet
     # to auto-discover from, $installDirPath is "").
