@@ -25,7 +25,11 @@ function Test-IsLicenseValid($license) {
         Write-ReturnValue ($license.licenseType -eq $PERPETUAL_LICENSE_LABEL)
         return
     }
-    Write-ReturnValue ((Get-Date $license.expirationDateUtc) -gt (Get-Date))
+    # InvariantCulture, not the ambient Get-Date parsing - the licensing API returns dates like
+    # "10/23/2026 07:20:04" (MM/dd/yyyy), which a day-first host locale (e.g. Norwegian) either
+    # fails to parse (day-of-month > 12) or silently swaps day/month for (day-of-month <= 12).
+    $expirationDate = [DateTime]::Parse($license.expirationDateUtc, [System.Globalization.CultureInfo]::InvariantCulture)
+    Write-ReturnValue ($expirationDate -gt (Get-Date))
 }
 
 function Get-SagaLicenseSummary($licensingContainerIp) {
@@ -63,7 +67,9 @@ function Get-SagaLicenseSummary($licensingContainerIp) {
     # Get-DaysUntilSagaLicenseExpires can do simple date math instead of string parsing. Stays $null
     # when every valid license is perpetual, which Get-DaysUntilSagaLicenseExpires treats as its own
     # distinct case rather than an error.
-    $futureExpirationDates = @($validLicenses | Where-Object { $_.expirationDateUtc } | ForEach-Object { [DateTime]$_.expirationDateUtc } | Sort-Object)
+    # See InvariantCulture note in Test-IsLicenseValid above - a plain [DateTime] cast is just as
+    # culture-sensitive as Get-Date and hits the same bug.
+    $futureExpirationDates = @($validLicenses | Where-Object { $_.expirationDateUtc } | ForEach-Object { [DateTime]::Parse($_.expirationDateUtc, [System.Globalization.CultureInfo]::InvariantCulture) } | Sort-Object)
     if ($futureExpirationDates.Count -gt 0) {
         $summary.EarliestExpirationDate = $futureExpirationDates[0]
     }

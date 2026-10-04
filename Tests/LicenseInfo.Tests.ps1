@@ -76,6 +76,39 @@ Describe "Test-IsLicenseValid" {
 
         Test-IsLicenseValid $license | Should -BeFalse
     }
+
+    It "parses the real API's MM/dd/yyyy date format correctly under a day-first host locale" {
+        # Regression test for a real bug hit at a customer: the licensing API returns dates like
+        # "10/23/2026 07:20:04" (MM/dd/yyyy), not the ISO "o" format the other fixtures use. Under
+        # a day-first culture (e.g. Norwegian), day=25 makes the naive Get-Date/[DateTime] parse
+        # throw ("month 25 doesn't exist") - this must succeed instead, parsed as December 25.
+        $originalCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
+        try {
+            [System.Threading.Thread]::CurrentThread.CurrentCulture = [System.Globalization.CultureInfo]::GetCultureInfo("nb-NO")
+            $license = New-FakeLicense @{ expirationDateUtc = "12/25/2099 10:00:00" }
+
+            Test-IsLicenseValid $license | Should -BeTrue
+        } finally {
+            [System.Threading.Thread]::CurrentThread.CurrentCulture = $originalCulture
+        }
+    }
+
+    It "does not silently swap day and month for MM/dd/yyyy dates under a day-first host locale" {
+        # Companion to the test above: when day-of-month <= 12, the naive parse doesn't throw, it
+        # silently swaps day/month instead - a worse bug since nothing signals the wrong result. An
+        # expiration date 5 days from now must not appear expired due to a swapped day/month.
+        $originalCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
+        try {
+            [System.Threading.Thread]::CurrentThread.CurrentCulture = [System.Globalization.CultureInfo]::GetCultureInfo("nb-NO")
+            $inFiveDays = (Get-Date).AddDays(5)
+            $expirationString = $inFiveDays.ToString("MM/dd/yyyy HH:mm:ss", [System.Globalization.CultureInfo]::InvariantCulture)
+            $license = New-FakeLicense @{ expirationDateUtc = $expirationString }
+
+            Test-IsLicenseValid $license | Should -BeTrue
+        } finally {
+            [System.Threading.Thread]::CurrentThread.CurrentCulture = $originalCulture
+        }
+    }
 }
 
 Describe "Get-SagaLicenseSummary" {
@@ -136,6 +169,24 @@ Describe "Get-SagaLicenseSummary" {
         $result = Get-SagaLicenseSummary "172.20.10.5"
 
         $result.EarliestExpirationDate.Date | Should -Be $sooner.Date
+    }
+
+    It "parses the real API's MM/dd/yyyy date format for EarliestExpirationDate under a day-first host locale" {
+        # Same regression as Test-IsLicenseValid above, for the other parsing site
+        # ([DateTime] cast, not Get-Date) - day=25 must not fail to parse as "month 25".
+        $originalCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
+        try {
+            [System.Threading.Thread]::CurrentThread.CurrentCulture = [System.Globalization.CultureInfo]::GetCultureInfo("nb-NO")
+            $license = New-FakeLicense @{ expirationDateUtc = "12/25/2099 10:00:00"; licenseType = "Subscription" }
+            Mock Get-SagaLicenses { @($license) }
+
+            $result = Get-SagaLicenseSummary "172.20.10.5"
+
+            $result.EarliestExpirationDate.Month | Should -Be 12
+            $result.EarliestExpirationDate.Day | Should -Be 25
+        } finally {
+            [System.Threading.Thread]::CurrentThread.CurrentCulture = $originalCulture
+        }
     }
 
     It "concatenates zero-count capabilities across licenses without deduplicating" {
